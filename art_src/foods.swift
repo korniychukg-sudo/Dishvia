@@ -1,1106 +1,1039 @@
 import Foundation
 import CoreGraphics
 
-// Thirty ways food sits on a plate. Each one is drawn — contour, form shading,
-// texture — never a filled silhouette. They compose: a bed can take a main
-// archetype and up to two more, then garnish on top.
+// Food, second edition. Opaque gouache heaped in a low three-quarter view:
+// every archetype has height, occlusion is real (back painted first, front
+// painted over it), and the accents stay vivid.
 
-// MARK: - Shared primitives
+// MARK: - Shared shapes
 
-/// A rounded mass of something: wash, form shading, contour. The workhorse.
-func mass(_ p: Plate, _ pts: [CGPoint], _ colour: Col, depth: Int = 2,
-          weight: Double = 1.6, spacing: Double = 3.0, strength: Double = 0.44,
-          seed: UInt64 = 5) {
-    guard pts.count > 2 else { return }
-    wash(p, pts, colour, strength: strength, bleed: max(1.2, weight * 1.6), seed: seed)
-    formShade(p, pts, inset: spacing * 3.4, depth: depth, spacing: spacing,
-              colour: Ink.sepiaSoft.al(0.6), seed: seed &+ 7)
-    penContour(p, pts, weight: weight, seed: seed &+ 13)
+/// A heap seen from the front: wide at the bed, domed on top.
+func heapPoints(cx: Double, cy: Double, rx: Double, height: Double,
+                rough: Double, seed: UInt64) -> [CGPoint] {
+    var rng = RNG(seed)
+    var pts: [CGPoint] = []
+    for i in 0...26 {
+        let t = Double(i) / 26.0
+        let a = Double.pi + t * Double.pi          // base, left to right
+        pts.append(pnt(cx + cos(a) * rx, cy + sin(a) * rx * 0.16))
+    }
+    for i in stride(from: 22, through: 4, by: -2) {
+        let t = Double(i) / 26.0
+        let x = cx - rx + 2 * rx * t
+        let lift = sin(t * Double.pi)
+        pts.append(pnt(x + rng.signed() * rx * rough,
+                       cy + height * (0.55 + 0.45 * lift) + rng.signed() * height * rough))
+    }
+    return pts
 }
 
-/// A highlight where the light strikes a rounded thing.
-func sheen(_ p: Plate, cx: Double, cy: Double, rx: Double, ry: Double, seed: UInt64) {
-    let lx = cos(p.light), ly = sin(p.light)
-    p.ellipse(cx + lx * rx * 0.38, cy + ly * ry * 0.38, rx * 0.30, ry * 0.22,
-              Ink.paper.al(0.30))
-    _ = seed
+/// A lump — one chunk, one dumpling, one ball — with a flatter base.
+func lumpPoints(cx: Double, cy: Double, rx: Double, ry: Double,
+                squash: Double, seed: UInt64) -> [CGPoint] {
+    var rng = RNG(seed)
+    var pts: [CGPoint] = []
+    for i in 0..<22 {
+        let a = Double(i) / 22.0 * 6.283185
+        let vert = sin(a) > 0 ? 1.0 : squash
+        let w = 1.0 + rng.signed() * 0.09
+        pts.append(pnt(cx + cos(a) * rx * w, cy + sin(a) * ry * vert * w))
+    }
+    return pts
 }
 
 func inBed(_ p: Plate, _ bed: Bed, _ body: () -> Void) {
     p.clip(bed.clip, body)
 }
 
-private func jitterRing(_ cx: Double, _ cy: Double, _ rx: Double, _ ry: Double,
-                        rough: Double, steps: Int, seed: UInt64) -> [CGPoint] {
-    blob(cx: cx, cy: cy, rx: rx, ry: ry, rough: rough, steps: steps, seed: seed)
+// MARK: - Garnish
+
+func drawGarnish(_ p: Plate, _ kind: String, bed: Bed, paletteKey: String,
+                 seed: UInt64, index: Int) {
+    let u = bed.rx * 0.92
+    var rng = RNG(seed &+ UInt64(index * 733) &+ 17)
+
+    // Garnish lands on the food, which rises above the bed centre.
+    func spot() -> (Double, Double) {
+        let a = rng.r(0, 6.283)
+        let rr = pow(rng.d(), 0.6)
+        return (bed.cx + cos(a) * bed.rx * 0.66 * rr,
+                bed.cy + bed.ry * 0.4 + abs(sin(a)) * u * 0.34 * rr + rng.r(0, u * 0.16))
+    }
+
+    inBed(p, bed) {
+        switch kind {
+        case "herbSprigs":
+            for k in 0..<rng.i(5, 8) {
+                let (hx, hy) = spot()
+                let dir = rng.r(0.6, 2.5)
+                let len = u * rng.r(0.10, 0.17)
+                penStroke(p, [pnt(hx, hy), pnt(hx + cos(dir) * len, hy + sin(dir) * len)],
+                          weight: u * 0.012, colour: Paint.herbDark, wobble: 0.4,
+                          taper: true, seed: seed &+ UInt64(k * 13))
+                for j in 0..<4 {
+                    let t = 0.3 + Double(j) * 0.22
+                    let side: Double = j % 2 == 0 ? 1 : -1
+                    dab(p, x: hx + cos(dir) * len * t + cos(dir + side * 1.5) * u * 0.020,
+                        y: hy + sin(dir) * len * t + sin(dir + side * 1.5) * u * 0.020,
+                        rx: u * 0.020, ry: u * 0.011, Paint.herbGreen,
+                        tilt: dir + side * 0.8, seed: seed &+ UInt64(k * 31 + j))
+                }
+            }
+        case "seedScatter":
+            for k in 0..<60 {
+                let (sx, sy) = spot()
+                dab(p, x: sx, y: sy, rx: u * rng.r(0.006, 0.011), ry: u * 0.006,
+                    Paint.charBrown.al(0.9), tilt: rng.r(0, 3.1), seed: seed &+ UInt64(k))
+            }
+        case "sesameDust":
+            for k in 0..<80 {
+                let (sx, sy) = spot()
+                let dark = rng.chance(0.3)
+                dab(p, x: sx, y: sy, rx: u * 0.008, ry: u * 0.0045,
+                    dark ? Paint.charBrown : Paint.creamWhite,
+                    tilt: rng.r(0, 3.1), seed: seed &+ UInt64(k))
+            }
+        case "chiliSlices":
+            for k in 0..<rng.i(5, 8) {
+                let (sx, sy) = spot()
+                let r = u * rng.r(0.028, 0.045)
+                dab(p, x: sx, y: sy, rx: r, ry: r * 0.62, Paint.chiliRed,
+                    tilt: rng.r(0, 3.1), outline: u * 0.006, seed: seed &+ UInt64(k * 11))
+                p.disc(sx, sy, r * 0.30, Paint.creamWhite.al(0.85))
+            }
+        case "scallionRings":
+            for k in 0..<rng.i(7, 11) {
+                let (sx, sy) = spot()
+                let r = u * rng.r(0.020, 0.034)
+                dab(p, x: sx, y: sy, rx: r, ry: r * 0.68, Paint.herbGreen,
+                    tilt: rng.r(0, 3.1), outline: u * 0.005, seed: seed &+ UInt64(k * 7))
+                p.disc(sx, sy, r * 0.38, Paint.creamWhite.al(0.75))
+            }
+        case "citrusWedge":
+            let wx = bed.cx + bed.rx * 0.55
+            let wy = bed.cy + bed.ry * 0.5
+            let r = u * 0.15
+            var wedge: [CGPoint] = [pnt(wx, wy)]
+            for j in 0...12 {
+                let t = 0.5 - 0.55 + Double(j) / 12.0 * 1.1
+                wedge.append(pnt(wx + cos(t) * r, wy + sin(t) * r))
+            }
+            gouache(p, wedge, Paint.saffron.lt(0.15), seed: seed &+ 5)
+            for j in 0..<5 {
+                let t = -0.45 + Double(j) / 4.0 * 0.9
+                penStroke(p, [pnt(wx, wy), pnt(wx + cos(t) * r * 0.9, wy + sin(t) * r * 0.9)],
+                          weight: u * 0.008, colour: Paint.creamWhite.al(0.9),
+                          wobble: 0.3, taper: true, seed: seed &+ UInt64(j * 11))
+            }
+            penContour(p, wedge, weight: u * 0.010, colour: Ink.sepia.al(0.8), seed: seed &+ 23)
+        case "sauceDrizzle":
+            for k in 0..<3 {
+                var line: [CGPoint] = []
+                let y0 = bed.cy + bed.ry * 0.5 + Double(k) * u * 0.07
+                for j in 0...22 {
+                    let t = Double(j) / 22.0
+                    line.append(pnt(bed.cx - bed.rx * 0.7 + bed.rx * 1.4 * t,
+                                    y0 + sin(t * 9 + Double(k)) * u * 0.05))
+                }
+                penStroke(p, line, weight: u * rng.r(0.014, 0.022),
+                          colour: Paint.sauceDark.al(0.9), wobble: u * 0.004,
+                          taper: true, seed: seed &+ UInt64(k * 17))
+            }
+        case "creamDollop":
+            let dx = bed.cx + rng.r(-0.3, 0.3) * bed.rx
+            let dy = bed.cy + bed.ry * 0.5 + u * 0.14
+            let dollop = heapPoints(cx: dx, cy: dy, rx: u * 0.13, height: u * 0.11,
+                                    rough: 0.10, seed: seed &+ 5)
+            gouacheForm(p, dollop, Chord(shadow: Paint.creamWhite.dk(0.18),
+                                         body: Paint.creamWhite,
+                                         light: Col(r: 1, g: 0.99, b: 0.96)),
+                        seed: seed &+ 7)
+            penContour(p, dollop, weight: u * 0.009, colour: Ink.sepia.al(0.55), seed: seed &+ 9)
+        case "nutCrumbs":
+            for k in 0..<rng.i(14, 20) {
+                let (nx, ny) = spot()
+                dab(p, x: nx, y: ny, rx: u * rng.r(0.012, 0.024), ry: u * rng.r(0.008, 0.015),
+                    Paint.chord("ochre").body.dk(rng.r(0, 0.2)), tilt: rng.r(0, 3.1),
+                    outline: u * 0.004, seed: seed &+ UInt64(k * 13))
+            }
+        case "oliveScatter":
+            for k in 0..<rng.i(4, 7) {
+                let (ox, oy) = spot()
+                let r = u * rng.r(0.024, 0.038)
+                dab(p, x: ox, y: oy, rx: r, ry: r * 0.8,
+                    rng.chance(0.5) ? Paint.herbDark : Paint.chord("plum").shadow,
+                    outline: u * 0.005, seed: seed &+ UInt64(k * 11))
+                p.disc(ox - r * 0.25, oy + r * 0.25, r * 0.22, Paint.creamWhite.al(0.5))
+            }
+        case "powderDust":
+            for k in 0..<120 {
+                let (dx, dy) = spot()
+                p.disc(dx, dy, u * rng.r(0.003, 0.007),
+                       (rng.chance(0.5) ? Paint.chiliRed : Paint.saffron).al(rng.r(0.3, 0.7)))
+                _ = k
+            }
+        case "flowerPetals":
+            for k in 0..<rng.i(4, 6) {
+                let (fx, fy) = spot()
+                let r = u * rng.r(0.024, 0.038)
+                for j in 0..<5 {
+                    let a = Double(j) / 5.0 * 6.283185 + Double(k)
+                    dab(p, x: fx + cos(a) * r * 0.6, y: fy + sin(a) * r * 0.6,
+                        rx: r * 0.42, ry: r * 0.26, Paint.chord("blush").light,
+                        tilt: a, seed: seed &+ UInt64(k * 31 + j))
+                }
+                p.disc(fx, fy, r * 0.22, Paint.saffron)
+            }
+        default:
+            break
+        }
+    }
 }
 
-// MARK: - Archetypes
+// MARK: - The thirty archetypes
 
-func drawFood(_ p: Plate, _ kind: String, bed: Bed, palette: Col, seed: UInt64, layer: Int) {
-    let u = min(bed.rx, bed.ry)
+func drawFood(_ p: Plate, _ kind: String, bed: Bed, paletteKey: String,
+              seed: UInt64, layer: Int) {
+    let u = bed.rx * 0.92
     var rng = RNG(seed &+ UInt64(layer * 101))
-    // Later layers sit a little back and to one side so nothing stacks dead centre.
-    let ox = layer == 0 ? 0.0 : rng.r(-0.30, 0.30) * bed.rx
-    let oy = layer == 0 ? 0.0 : rng.r(0.05, 0.34) * bed.ry
+    let chord = Paint.chord(paletteKey)
+
+    // Layered food: extras go behind (higher y, smaller), main in front.
+    let ox = layer == 0 ? 0.0 : rng.r(-0.4, 0.4) * bed.rx
+    let oy = layer == 0 ? 0.0 : bed.ry * 0.8 + rng.r(0, bed.ry * 0.5)
     let cx = bed.cx + ox
     let cy = bed.cy + oy
-    let sc = layer == 0 ? 1.0 : 0.62
+    let sc = layer == 0 ? 1.0 : 0.55
 
     inBed(p, bed) {
         switch kind {
 
         case "noodleNest":
-            let rx = bed.rx * 0.86 * sc, ry = bed.ry * 0.80 * sc
-            // the mass of the nest first, so the strands read against something
-            let heap = jitterRing(cx, cy, rx * 0.94, ry * 0.90, rough: 0.07, steps: 28,
-                                  seed: seed &+ 3)
-            wash(p, heap, palette.lt(0.10), strength: 0.34, bleed: u * 0.024, seed: seed &+ 5)
-            for k in 0..<34 {
-                let a0 = rng.r(0, 6.283)
-                let rr = rng.r(0.26, 0.98)
-                let span = rng.r(2.0, 4.2)
-                var strand: [CGPoint] = []
-                for j in 0...20 {
-                    let a = a0 + span * Double(j) / 20.0
-                    let wob = 1.0 + sin(Double(j) * 0.8 + Double(k)) * 0.09
-                    strand.append(pnt(cx + cos(a) * rx * rr * wob,
-                                      cy + sin(a) * ry * rr * wob))
+            let rx = bed.rx * 0.82 * sc
+            let mound = heapPoints(cx: cx, cy: cy - bed.ry * 0.30, rx: rx, height: u * 0.20 * sc,
+                                   rough: 0.05, seed: seed &+ 3)
+            gouache(p, mound, chord.body, seed: seed &+ 5)
+            p.clip(polyPath(mound)) {
+                for k in 0..<46 {
+                    var strand: [CGPoint] = []
+                    let y0 = cy - bed.ry * 0.30 + rng.r(-u * 0.02, u * 0.20)
+                    let amp = u * rng.r(0.02, 0.05)
+                    let ph = rng.r(0, 6.283)
+                    for j in 0...14 {
+                        let t = Double(j) / 14.0
+                        strand.append(pnt(cx - rx + 2 * rx * t,
+                                          y0 + sin(t * 7 + ph) * amp))
+                    }
+                    penStroke(p, strand, weight: u * rng.r(0.026, 0.040),
+                              colour: (k % 3 == 0 ? chord.light : chord.shadow)
+                                  .al(rng.r(0.6, 0.95)),
+                              wobble: u * 0.004, taper: true, seed: seed &+ UInt64(k * 7))
                 }
-                // a pale body with a dark edge is what makes a strand read as round
-                penStroke(p, strand, weight: u * rng.r(0.056, 0.082),
-                          colour: palette.lt(rng.r(0.20, 0.42)).al(0.95),
-                          wobble: u * 0.006, taper: true, seed: seed &+ UInt64(k * 7))
-                penStroke(p, strand.map { pnt(Double($0.x), Double($0.y) - u * 0.020) },
-                          weight: u * rng.r(0.016, 0.026),
-                          colour: Ink.sepia.al(rng.r(0.55, 0.85)),
-                          wobble: u * 0.005, taper: true, seed: seed &+ UInt64(k * 11 + 3))
             }
-            // a few strands lifted clear of the nest
-            for k in 0..<5 {
-                let a = rng.r(0, 6.283)
-                penStroke(p, [CGPoint(x: cx + cos(a) * rx * 0.3, y: cy + sin(a) * ry * 0.3),
-                              CGPoint(x: cx + cos(a) * rx * 0.9, y: cy + sin(a) * ry * 0.9 + ry * 0.25),
-                              CGPoint(x: cx + cos(a) * rx * 1.05, y: cy + sin(a) * ry * 1.1 + ry * 0.10)],
-                          weight: u * 0.048, colour: Ink.sepia.al(0.9), wobble: u * 0.008,
-                          taper: true, seed: seed &+ UInt64(k * 31 + 3))
+            inkOver(p, mound, weight: u * 0.014, seed: seed &+ 9)
+            // a lifted twist of noodles on top
+            var lift: [CGPoint] = []
+            for j in 0...12 {
+                let t = Double(j) / 12.0
+                lift.append(pnt(cx - rx * 0.3 + rx * 0.6 * t,
+                                cy - bed.ry * 0.30 + u * 0.20 + sin(t * .pi) * u * 0.09))
             }
+            penStroke(p, lift, weight: u * 0.024, colour: chord.light, wobble: u * 0.004,
+                      taper: true, seed: seed &+ 11)
+            penStroke(p, lift.map { CGPoint(x: $0.x, y: $0.y - CGFloat(u * 0.018)) },
+                      weight: u * 0.020, colour: chord.body, wobble: u * 0.004,
+                      taper: true, seed: seed &+ 13)
 
         case "brothSurface":
-            let ring = jitterRing(cx, cy, bed.rx * 0.97, bed.ry * 0.95, rough: 0.02, steps: 40,
-                                  seed: seed &+ 3)
-            wash(p, ring, palette.dk(0.06), strength: 0.40, bleed: u * 0.030, seed: seed &+ 5)
-            // ripples
-            for k in 0..<4 {
-                let f = 0.32 + Double(k) * 0.18
-                penBroken(p, ellipsePoints(cx: cx, cy: cy, rx: bed.rx * f, ry: bed.ry * f, steps: 40),
-                          weight: u * 0.014, colour: Ink.sepiaSoft.al(0.28),
-                          pieces: 3, gap: 0.16, wobble: u * 0.006, seed: seed &+ UInt64(k * 11))
+            let pool = ringPoints(cx, cy, bed.rx * 0.95 * sc, bed.ry * 0.90 * sc)
+            gouache(p, pool, chord.shadow, unevenness: 0.05, seed: seed &+ 3)
+            let inner = ringPoints(cx, cy + bed.ry * 0.06, bed.rx * 0.80, bed.ry * 0.70)
+            gouache(p, inner, chord.body, unevenness: 0.06, edgeDark: 0.05, seed: seed &+ 5)
+            // fat beads catching the light
+            for k in 0..<12 {
+                let a = rng.r(0, 6.283)
+                let rr = rng.r(0.1, 0.8)
+                let x = cx + cos(a) * bed.rx * 0.6 * rr
+                let y = cy + sin(a) * bed.ry * 0.5 * rr
+                p.disc(x, y, u * rng.r(0.012, 0.028), Paint.saffron.al(0.75))
+                p.disc(x, y, u * rng.r(0.005, 0.010), chord.light.al(0.9))
+                _ = k
             }
-            // beads of fat catching the light
-            for k in 0..<16 {
-                let a = rng.r(0, 6.283), rr = rng.r(0.1, 0.9)
-                let x = cx + cos(a) * bed.rx * rr, y = cy + sin(a) * bed.ry * rr
-                let r = u * rng.r(0.020, 0.058)
-                let e = ellipsePoints(cx: x, cy: y, rx: r, ry: r * 0.78, steps: 16)
-                p.poly(e, Ink.saffron.al(0.30))
-                penStroke(p, e + [e[0]], weight: u * 0.008, colour: Ink.sepiaSoft.al(0.45),
-                          wobble: 0.4, taper: false, seed: seed &+ UInt64(k * 5))
-                p.ellipse(x - r * 0.25, y + r * 0.25, r * 0.28, r * 0.20, Ink.paper.al(0.35))
+            // steam: two pale curls rising
+            for k in 0..<2 {
+                var curl: [CGPoint] = []
+                let x0 = cx + (Double(k) - 0.5) * bed.rx * 0.5
+                for j in 0...12 {
+                    let t = Double(j) / 12.0
+                    curl.append(pnt(x0 + sin(t * 4 + Double(k)) * u * 0.05,
+                                    cy + bed.ry + t * u * 0.42))
+                }
+                penStroke(p, curl, weight: u * 0.016, colour: Paint.creamWhite.al(0.5),
+                          wobble: u * 0.006, taper: true, seed: seed &+ UInt64(k * 17))
             }
 
         case "riceMound":
-            let rx = bed.rx * 0.66 * sc, ry = bed.ry * 0.62 * sc
-            var dome: [CGPoint] = []
-            for k in 0..<34 {
-                let a = Double(k) / 34.0 * 6.283185
-                let lift = 1.0 + 0.30 * max(0, sin(a))
-                dome.append(CGPoint(x: cx + cos(a) * rx * (1 + rng.r(-0.03, 0.03)),
-                                    y: cy + sin(a) * ry * lift))
-            }
-            mass(p, dome, Ink.cream, depth: 2, weight: u * 0.020, spacing: u * 0.030,
-                 strength: 0.30, seed: seed &+ 5)
-            p.clip(polyPath(dome)) {
-                for k in 0..<260 {
-                    let a = rng.r(0, 6.283), rr = rng.r(0, 1)
-                    let gx = cx + cos(a) * rx * rr
-                    let gy = cy + sin(a) * ry * rr * 1.2
-                    let ga = rng.r(0, 3.14)
-                    let gl = u * rng.r(0.020, 0.040)
-                    penStroke(p, [CGPoint(x: gx - cos(ga) * gl, y: gy - sin(ga) * gl),
-                                  CGPoint(x: gx + cos(ga) * gl, y: gy + sin(ga) * gl)],
-                              weight: u * 0.011, colour: Ink.sepiaSoft.al(rng.r(0.18, 0.48)),
-                              wobble: 0.3, taper: true, seed: seed &+ UInt64(k))
+            let mound = heapPoints(cx: cx, cy: cy, rx: bed.rx * 0.72 * sc,
+                                   height: u * 0.28 * sc, rough: 0.04, seed: seed &+ 3)
+            gouacheForm(p, mound, Chord(shadow: Paint.creamWhite.dk(0.22),
+                                        body: Paint.creamWhite,
+                                        light: Col(r: 0.99, g: 0.97, b: 0.93)),
+                        seed: seed &+ 5)
+            p.clip(polyPath(mound)) {
+                for k in 0..<160 {
+                    let a = rng.r(0, 6.283)
+                    let rr = pow(rng.d(), 0.6)
+                    dab(p, x: cx + cos(a) * bed.rx * 0.62 * rr,
+                        y: cy + u * 0.16 + sin(a) * u * 0.17 * rr,
+                        rx: u * 0.014, ry: u * 0.006,
+                        (rng.chance(0.6) ? Paint.creamWhite.dk(0.10) : Paint.creamWhite.dk(0.20)),
+                        tilt: rng.r(0, 3.1), seed: seed &+ UInt64(k))
                 }
             }
+            inkOver(p, mound, weight: u * 0.013, seed: seed &+ 9)
 
         case "riceScatter":
-            for k in 0..<300 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.55)
-                let gx = cx + cos(a) * bed.rx * 0.92 * rr * sc
-                let gy = cy + sin(a) * bed.ry * 0.88 * rr * sc
-                let ga = rng.r(0, 3.14)
-                let gl = u * rng.r(0.024, 0.044)
-                let tone = rng.chance(0.22) ? palette : Ink.cream
-                penStroke(p, [CGPoint(x: gx - cos(ga) * gl, y: gy - sin(ga) * gl),
-                              CGPoint(x: gx + cos(ga) * gl, y: gy + sin(ga) * gl)],
-                          weight: u * rng.r(0.014, 0.022), colour: tone.dk(0.25).al(rng.r(0.4, 0.9)),
-                          wobble: 0.3, taper: true, seed: seed &+ UInt64(k))
+            let spread = ringPoints(cx, cy + bed.ry * 0.1, bed.rx * 0.88 * sc, bed.ry * 0.80 * sc)
+            gouache(p, spread, Paint.creamWhite.dk(0.06), unevenness: 0.06, seed: seed &+ 3)
+            p.clip(polyPath(spread)) {
+                for k in 0..<200 {
+                    let a = rng.r(0, 6.283)
+                    let rr = pow(rng.d(), 0.5)
+                    dab(p, x: cx + cos(a) * bed.rx * 0.8 * rr,
+                        y: cy + bed.ry * 0.1 + sin(a) * bed.ry * 0.7 * rr,
+                        rx: u * 0.015, ry: u * 0.006,
+                        rng.chance(0.18) ? chord.body : Paint.creamWhite.dk(rng.r(0.04, 0.16)),
+                        tilt: rng.r(0, 3.1), seed: seed &+ UInt64(k))
+                }
             }
+            penContour(p, spread, weight: u * 0.010, colour: Ink.sepia.al(0.5), seed: seed &+ 7)
 
         case "flatbread":
-            let rx = bed.rx * 0.90 * sc, ry = bed.ry * 0.86 * sc
-            let round = jitterRing(cx, cy, rx, ry, rough: 0.045, steps: 34, seed: seed &+ 3)
-            mass(p, round, Ink.ochre.mix(palette, 0.30), depth: 1, weight: u * 0.022,
-                 spacing: u * 0.034, strength: 0.34, seed: seed &+ 5)
-            p.clip(polyPath(round)) {
-                // blisters from the oven
-                for k in 0..<26 {
-                    let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.6)
-                    let bx = cx + cos(a) * rx * rr, by = cy + sin(a) * ry * rr
-                    let br = u * rng.r(0.030, 0.085)
-                    let bl = jitterRing(bx, by, br, br * 0.78, rough: 0.30, steps: 14,
-                                        seed: seed &+ UInt64(k * 13))
-                    p.poly(bl, Ink.char.al(rng.r(0.20, 0.42)))
-                    penContour(p, bl, weight: u * 0.008, colour: Ink.sepiaSoft.al(0.5),
-                               seed: seed &+ UInt64(k))
+            // a folded flatbread: back half standing, front half lying
+            let rx = bed.rx * 0.80 * sc
+            let back = lumpPoints(cx: cx, cy: cy + u * 0.10, rx: rx * 0.9, ry: u * 0.26,
+                                  squash: 0.25, seed: seed &+ 3)
+            gouacheForm(p, back, Chord(shadow: chord.shadow, body: chord.body.lt(0.06),
+                                       light: chord.light), seed: seed &+ 5)
+            inkOver(p, back, weight: u * 0.013, seed: seed &+ 7)
+            let front = lumpPoints(cx: cx, cy: cy - u * 0.02, rx: rx, ry: u * 0.14,
+                                   squash: 0.4, seed: seed &+ 9)
+            gouacheForm(p, front, chord, seed: seed &+ 11)
+            inkOver(p, front, weight: u * 0.013, seed: seed &+ 13)
+            // char blisters on both
+            for (i, region) in [back, front].enumerated() {
+                p.clip(polyPath(region)) {
+                    for k in 0..<14 {
+                        let a = rng.r(0, 6.283)
+                        let rr = pow(rng.d(), 0.7)
+                        dab(p, x: cx + cos(a) * rx * 0.7 * rr,
+                            y: cy + Double(i == 0 ? 1 : -1) * u * 0.05 + sin(a) * u * 0.10 * rr,
+                            rx: u * rng.r(0.012, 0.030), ry: u * rng.r(0.008, 0.018),
+                            Paint.charBrown.al(rng.r(0.5, 0.85)), tilt: rng.r(0, 3.1),
+                            seed: seed &+ UInt64(i * 40 + k))
+                    }
                 }
-                // a fold, so it is bread and not a coaster
-                penStroke(p, [CGPoint(x: cx - rx * 0.8, y: cy + ry * 0.30),
-                              CGPoint(x: cx, y: cy + ry * 0.12),
-                              CGPoint(x: cx + rx * 0.78, y: cy + ry * 0.34)],
-                          weight: u * 0.020, colour: Ink.sepiaSoft.al(0.7), wobble: u * 0.008,
-                          taper: true, seed: seed &+ 41)
             }
 
         case "loafSlices":
             for k in 0..<3 {
                 let lean = Double(k) - 1.0
-                let sx = cx + lean * bed.rx * 0.44 * sc
-                let sy = cy - lean * bed.ry * 0.10
-                let hw = bed.rx * 0.30 * sc, hh = bed.ry * 0.56 * sc
-                var sl: [CGPoint] = []
-                for j in 0..<26 {
-                    let a = Double(j) / 26.0 * 6.283185
-                    let sq = 1.0 + 0.16 * cos(a * 2)
-                    sl.append(CGPoint(x: sx + cos(a + 0.12 * lean) * hw * sq,
-                                      y: sy + sin(a + 0.12 * lean) * hh * sq))
+                let sx = cx + lean * bed.rx * 0.42 * sc
+                let sy = cy + Double(2 - k) * u * 0.05
+                let slice = lumpPoints(cx: sx, cy: sy + u * 0.16, rx: bed.rx * 0.26 * sc,
+                                       ry: u * 0.24, squash: 0.30, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, slice, Chord(shadow: Paint.creamWhite.dk(0.25),
+                                            body: Paint.creamWhite.dk(0.05),
+                                            light: Paint.creamWhite.lt(0.1)),
+                            seed: seed &+ UInt64(k * 17))
+                // the crust arc
+                var crust: [CGPoint] = []
+                for j in 0...14 {
+                    let a = Double.pi * 0.06 + Double(j) / 14.0 * Double.pi * 0.88
+                    crust.append(pnt(sx + cos(a) * bed.rx * 0.26 * sc,
+                                     sy + u * 0.16 + sin(a) * u * 0.24))
                 }
-                mass(p, sl, Ink.cream.mix(palette, 0.20), depth: 2, weight: u * 0.020,
-                     spacing: u * 0.030, strength: 0.32, seed: seed &+ UInt64(k * 17))
-                // crust band and an open crumb
-                penStroke(p, sl + [sl[0]], weight: u * 0.030, colour: Ink.umber.al(0.55),
-                          wobble: u * 0.006, taper: false, seed: seed &+ UInt64(k * 5))
-                p.clip(polyPath(sl)) {
-                    for j in 0..<44 {
-                        let bx = sx + rng.r(-0.75, 0.75) * hw
-                        let by = sy + rng.r(-0.75, 0.75) * hh
-                        let br = u * rng.r(0.012, 0.034)
-                        p.ellipse(bx, by, br, br * 0.8, Ink.sepiaSoft.al(rng.r(0.12, 0.30)))
+                penStroke(p, crust, weight: u * 0.030, colour: chord.shadow,
+                          wobble: u * 0.004, taper: false, seed: seed &+ UInt64(k * 5))
+                p.clip(polyPath(slice)) {
+                    for j in 0..<16 {
+                        p.disc(sx + rng.r(-0.7, 0.7) * bed.rx * 0.22,
+                               sy + u * 0.16 + rng.r(-0.7, 0.7) * u * 0.18,
+                               u * rng.r(0.006, 0.014), Paint.creamWhite.dk(0.28).al(0.5))
                         _ = j
                     }
                 }
+                inkOver(p, slice, weight: u * 0.011, hatchShadow: false, seed: seed &+ UInt64(k * 19))
             }
 
         case "dumplings":
-            let n = rng.i(4, 6)
+            let n = rng.i(4, 5)
             for k in 0..<n {
-                let a = Double(k) / Double(n) * 6.283185 + rng.r(-0.2, 0.2)
-                let dx = cx + cos(a) * bed.rx * 0.46 * sc
-                let dy = cy + sin(a) * bed.ry * 0.42 * sc
-                let rx = bed.rx * 0.30 * sc, ry = bed.ry * 0.26 * sc
-                var body: [CGPoint] = []
-                for j in 0..<26 {
-                    let t = Double(j) / 26.0 * 6.283185
-                    // flat-bottomed, plump on top
-                    let lift = sin(t) > 0 ? 1.10 : 0.70
-                    body.append(CGPoint(x: dx + cos(t) * rx, y: dy + sin(t) * ry * lift))
+                let t = Double(k) / Double(max(1, n - 1))
+                let back = k % 2 == 1
+                let dx = cx - bed.rx * 0.58 + bed.rx * 1.16 * t + rng.r(-0.04, 0.04) * bed.rx
+                let dy = cy - bed.ry * 0.25 + (back ? u * 0.18 : 0) + rng.r(-0.02, 0.02) * u
+                let r = u * (back ? 0.22 : 0.27) * sc
+                let body = lumpPoints(cx: dx, cy: dy + r * 0.5, rx: r, ry: r * 0.85,
+                                      squash: 0.35, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, body, Chord(shadow: Paint.creamWhite.dk(0.14).mix(Paint.chord("ochre").body, 0.18),
+                                           body: Paint.creamWhite,
+                                           light: Paint.creamWhite.lt(0.10)),
+                            depth: 0.7, seed: seed &+ UInt64(k * 17))
+                for j in 0..<5 {
+                    let px = dx - r * 0.5 + Double(j) * r * 0.25
+                    penStroke(p, [pnt(px, dy + r * 1.15), pnt(px + r * 0.12, dy + r * 0.62)],
+                              weight: u * 0.011, colour: Ink.sepiaSoft.al(0.8),
+                              wobble: 0.4, taper: true, seed: seed &+ UInt64(k * 31 + j))
                 }
-                mass(p, body, Ink.cream.mix(palette, 0.14), depth: 2, weight: u * 0.018,
-                     spacing: u * 0.026, strength: 0.30, seed: seed &+ UInt64(k * 23))
-                // the pleats along the crest
-                for j in 0..<6 {
-                    let t = -0.35 + Double(j) / 5.0 * 0.70
-                    let px = dx + t * rx * 1.5
-                    penStroke(p, [CGPoint(x: px, y: dy + ry * 0.30),
-                                  CGPoint(x: px + rx * 0.10, y: dy + ry * 1.02)],
-                              weight: u * 0.014, colour: Ink.sepiaSoft.al(0.75),
-                              wobble: u * 0.004, taper: true, seed: seed &+ UInt64(k * 31 + j))
-                }
-                sheen(p, cx: dx, cy: dy, rx: rx, ry: ry, seed: seed)
+                penContour(p, body, weight: u * 0.012, colour: Ink.sepia.al(0.75),
+                           seed: seed &+ UInt64(k * 19))
             }
 
         case "skewers":
-            let n = rng.i(2, 3)
-            for k in 0..<n {
-                let spread = (Double(k) - Double(n - 1) / 2)
-                let ang = 0.28 + spread * 0.34
-                let dx = cos(ang), dy = sin(ang)
-                let sx = cx - dx * bed.rx * 0.95 * sc - spread * bed.ry * 0.22
-                let sy = cy - dy * bed.rx * 0.95 * sc - spread * bed.ry * 0.30
-                let ex = cx + dx * bed.rx * 1.02 * sc - spread * bed.ry * 0.22
-                let ey = cy + dy * bed.rx * 1.02 * sc - spread * bed.ry * 0.30
-                penStroke(p, [CGPoint(x: sx, y: sy), CGPoint(x: ex, y: ey)],
-                          weight: u * 0.026, colour: Ink.wood.dk(0.15),
-                          wobble: u * 0.004, taper: true, seed: seed &+ UInt64(k * 7))
+            for k in 0..<rng.i(2, 3) {
+                let lane = Double(k) - 0.5
+                let sy = cy + lane * u * 0.16 + u * 0.06
+                let x0 = cx - bed.rx * (0.9 - Double(k) * 0.06)
+                let x1 = cx + bed.rx * (0.9 - Double(k) * 0.04)
+                penStroke(p, [pnt(x0 - u * 0.10, sy - lane * u * 0.03),
+                              pnt(x1 + u * 0.12, sy + lane * u * 0.05)],
+                          weight: u * 0.020, colour: Paint.woodBoard.shadow,
+                          wobble: 0.4, taper: true, seed: seed &+ UInt64(k * 7))
                 for j in 0..<4 {
-                    let t = 0.24 + Double(j) / 3.0 * 0.56
-                    let bx = sx + (ex - sx) * t, by = sy + (ey - sy) * t
-                    let br = u * 0.135 * sc
-                    let chunk = jitterRing(bx, by, br, br * 0.86, rough: 0.16, steps: 18,
+                    let t = 0.14 + Double(j) * 0.24
+                    let bx = x0 + (x1 - x0) * t
+                    let r = u * 0.13 * sc
+                    let piece = lumpPoints(cx: bx, cy: sy + r * 0.3, rx: r,
+                                           ry: r * 0.82, squash: 0.5,
                                            seed: seed &+ UInt64(k * 41 + j))
-                    mass(p, chunk, j % 2 == 0 ? palette : palette.dk(0.18), depth: 2,
-                         weight: u * 0.016, spacing: u * 0.024, strength: 0.48,
-                         seed: seed &+ UInt64(k * 53 + j))
-                    // char where it met the fire
-                    penBroken(p, [CGPoint(x: bx - br * 0.7, y: by + br * 0.4),
-                                  CGPoint(x: bx + br * 0.7, y: by + br * 0.2)],
-                              weight: u * 0.016, colour: Ink.char.al(0.55), pieces: 2,
-                              gap: 0.2, wobble: 0.6, seed: seed &+ UInt64(j))
+                    gouacheForm(p, piece,
+                                j % 2 == 0 ? chord
+                                           : Chord(shadow: chord.shadow.dk(0.12),
+                                                   body: chord.body.dk(0.14),
+                                                   light: chord.light.dk(0.10)),
+                                seed: seed &+ UInt64(k * 53 + j))
+                    // char kiss on the underside
+                    penBroken(p, [pnt(bx - r * 0.6, sy - r * 0.25),
+                                  pnt(bx + r * 0.6, sy - r * 0.30)],
+                              weight: u * 0.014, colour: Paint.charBrown.al(0.8),
+                              pieces: 2, gap: 0.2, wobble: 0.5, seed: seed &+ UInt64(j))
+                    inkOver(p, piece, weight: u * 0.011, seed: seed &+ UInt64(k * 61 + j))
                 }
             }
 
         case "stewChunks":
-            let pool = jitterRing(cx, cy, bed.rx * 0.92 * sc, bed.ry * 0.86 * sc,
-                                  rough: 0.05, steps: 30, seed: seed &+ 3)
-            wash(p, pool, palette.dk(0.10), strength: 0.46, bleed: u * 0.028, seed: seed &+ 5)
-            for k in 0..<7 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.5)
-                let bx = cx + cos(a) * bed.rx * 0.58 * rr * sc
-                let by = cy + sin(a) * bed.ry * 0.54 * rr * sc
-                let br = u * rng.r(0.105, 0.175) * sc
-                let chunk = jitterRing(bx, by, br, br * rng.r(0.68, 0.92), rough: 0.22,
-                                       steps: 16, seed: seed &+ UInt64(k * 19))
-                mass(p, chunk, k % 3 == 0 ? Ink.herb : palette.lt(0.16), depth: 2,
-                     weight: u * 0.016, spacing: u * 0.024, strength: 0.46,
-                     seed: seed &+ UInt64(k * 29))
-                sheen(p, cx: bx, cy: by, rx: br, ry: br * 0.8, seed: seed)
+            let pool = ringPoints(cx, cy, bed.rx * 0.92 * sc, bed.ry * 0.85 * sc)
+            gouache(p, pool, chord.shadow, unevenness: 0.06, seed: seed &+ 3)
+            for k in 0..<6 {
+                let a = Double(k) / 6.0 * 6.283 + rng.r(-0.3, 0.3)
+                let rr = rng.r(0.15, 0.62)
+                let bx = cx + cos(a) * bed.rx * 0.55 * rr
+                let by = cy + sin(a) * bed.ry * 0.45 * rr + u * 0.04
+                let r = u * rng.r(0.12, 0.16) * sc
+                let piece = lumpPoints(cx: bx, cy: by + r * 0.3, rx: r, ry: r * 0.8,
+                                       squash: 0.45, seed: seed &+ UInt64(k * 19))
+                gouacheForm(p, piece,
+                            k % 3 == 0 ? Chord(shadow: Paint.herbDark,
+                                               body: Paint.herbGreen,
+                                               light: Paint.herbGreen.lt(0.25))
+                                       : Chord(shadow: chord.shadow.dk(0.06),
+                                               body: chord.body.lt(0.10),
+                                               light: chord.light),
+                            seed: seed &+ UInt64(k * 29))
+                inkOver(p, piece, weight: u * 0.011, seed: seed &+ UInt64(k * 37))
             }
 
         case "curryPool":
-            let pool = jitterRing(cx, cy, bed.rx * 0.88 * sc, bed.ry * 0.82 * sc,
-                                  rough: 0.07, steps: 30, seed: seed &+ 3)
-            wash(p, pool, palette, strength: 0.52, bleed: u * 0.034, seed: seed &+ 5)
-            penContour(p, pool, weight: u * 0.016, colour: Ink.sepiaSoft.al(0.6), seed: seed &+ 9)
-            // the oil that separates and rides on top
-            for k in 0..<9 {
-                let a = rng.r(0, 6.283), rr = rng.r(0.15, 0.85)
-                let ex = cx + cos(a) * bed.rx * 0.6 * rr
-                let ey = cy + sin(a) * bed.ry * 0.55 * rr
-                let er = u * rng.r(0.030, 0.075)
-                let ring = ellipsePoints(cx: ex, cy: ey, rx: er, ry: er * 0.8, steps: 16)
-                p.poly(ring, Ink.saffron.al(0.34))
-                penStroke(p, ring + [ring[0]], weight: u * 0.008,
-                          colour: Ink.rust.al(0.45), wobble: 0.4, taper: false,
-                          seed: seed &+ UInt64(k * 7))
-            }
-            // a swirl through the middle
+            let pool = ringPoints(cx, cy, bed.rx * 0.92 * sc, bed.ry * 0.86 * sc)
+            gouache(p, pool, chord.body, unevenness: 0.09, seed: seed &+ 3)
+            // the split fat rim and a cream swirl
+            penStroke(p, ringPoints(cx, cy, bed.rx * 0.80, bed.ry * 0.70, steps: 40)
+                        + [pnt(cx + bed.rx * 0.80, cy)],
+                      weight: u * 0.018, colour: Paint.saffron.al(0.75),
+                      wobble: u * 0.006, taper: false, seed: seed &+ 5)
             var swirl: [CGPoint] = []
-            for j in 0...30 {
-                let t = Double(j) / 30.0
-                let a = t * 6.0
-                let r = bed.rx * 0.10 + t * bed.rx * 0.52
-                swirl.append(CGPoint(x: cx + cos(a) * r, y: cy + sin(a) * r * 0.9))
+            for j in 0...24 {
+                let t = Double(j) / 24.0
+                let a = t * 4.6
+                let r = bed.rx * (0.08 + t * 0.5)
+                swirl.append(pnt(cx + cos(a) * r, cy + sin(a) * r * 0.55))
             }
-            penStroke(p, swirl, weight: u * 0.020, colour: Ink.cream.al(0.55),
-                      wobble: u * 0.006, taper: true, seed: seed &+ 47)
+            penStroke(p, swirl, weight: u * 0.020, colour: Paint.creamWhite.al(0.85),
+                      wobble: u * 0.004, taper: true, seed: seed &+ 7)
+            penContour(p, pool, weight: u * 0.012, colour: Ink.sepia.al(0.7), seed: seed &+ 9)
 
         case "wholeFish":
-            let L = bed.rx * 0.95 * sc, H = bed.ry * 0.36 * sc
+            let L = bed.rx * 0.88 * sc
+            let H = u * 0.23 * sc
             var body: [CGPoint] = []
-            for j in 0...36 {
-                let t = Double(j) / 36.0
-                let x = cx - L + 2 * L * t
-                body.append(CGPoint(x: x, y: cy + H * sin(.pi * t) * (0.75 + 0.25 * cos(t * 3))))
+            for j in 0...30 {
+                let t = Double(j) / 30.0
+                body.append(pnt(cx - L + 2 * L * t, cy + u * 0.08 + H * sin(Double.pi * t)))
             }
-            for j in stride(from: 36, through: 0, by: -1) {
-                let t = Double(j) / 36.0
-                let x = cx - L + 2 * L * t
-                body.append(CGPoint(x: x, y: cy - H * sin(.pi * t) * (0.70 + 0.20 * cos(t * 2))))
+            for j in stride(from: 30, through: 0, by: -1) {
+                let t = Double(j) / 30.0
+                body.append(pnt(cx - L + 2 * L * t, cy + u * 0.08 - H * 0.85 * sin(Double.pi * t)))
             }
-            mass(p, body, palette.lt(0.20), depth: 2, weight: u * 0.020, spacing: u * 0.026,
-                 strength: 0.36, seed: seed &+ 5)
+            gouacheForm(p, body, chord, seed: seed &+ 3)
+            // tail and fin painted over
+            let tail = [pnt(cx - L * 0.98, cy + u * 0.08),
+                        pnt(cx - L * 1.26, cy + u * 0.08 + H * 0.95),
+                        pnt(cx - L * 1.14, cy + u * 0.08),
+                        pnt(cx - L * 1.26, cy + u * 0.08 - H * 0.85)]
+            gouache(p, tail, chord.shadow, seed: seed &+ 5)
+            penContour(p, tail, weight: u * 0.010, colour: Ink.sepia.al(0.85), seed: seed &+ 7)
             p.clip(polyPath(body)) {
-                // scales: overlapping arcs, not dots
-                var col = 0
-                var x = cx - L * 0.55
-                while x < cx + L * 0.85 {
-                    var y = cy - H * 0.85
-                    while y < cy + H * 0.85 {
+                // scale arcs in the shadow tone
+                var x = cx - L * 0.5
+                while x < cx + L * 0.8 {
+                    var yy = cy + u * 0.08 - H * 0.7
+                    while yy < cy + u * 0.08 + H * 0.8 {
                         var arc: [CGPoint] = []
-                        for j in 0...8 {
-                            let a = .pi * 0.15 + Double(j) / 8.0 * .pi * 0.7
-                            arc.append(CGPoint(x: x + cos(a) * u * 0.070,
-                                               y: y + sin(a) * u * 0.055))
+                        for j in 0...6 {
+                            let a = Double.pi * 0.2 + Double(j) / 6.0 * Double.pi * 0.6
+                            arc.append(pnt(x + cos(a) * u * 0.045, yy + sin(a) * u * 0.035))
                         }
-                        penStroke(p, arc, weight: u * 0.009,
-                                  colour: Ink.sepiaSoft.al(0.42), wobble: 0.3, taper: true,
-                                  seed: seed &+ u64(Int(x) &* 7 &+ Int(y)))
-                        y += u * 0.090
+                        penStroke(p, arc, weight: u * 0.007,
+                                  colour: chord.shadow.al(0.55), wobble: 0.3,
+                                  taper: true, seed: seed &+ u64(Int(x + yy)))
+                        yy += u * 0.055
                     }
-                    x += u * 0.075
-                    col += 1
-                    _ = col
+                    x += u * 0.05
+                }
+                // grill bars across
+                for k in 0..<4 {
+                    let gx = cx - L * 0.5 + Double(k) * L * 0.38
+                    penStroke(p, [pnt(gx, cy + u * 0.08 - H), pnt(gx + L * 0.08, cy + u * 0.08 + H)],
+                              weight: u * 0.020, colour: Paint.charBrown.al(0.65),
+                              wobble: u * 0.003, taper: false, seed: seed &+ UInt64(k * 11))
                 }
             }
-            // tail
-            let tail = [CGPoint(x: cx - L * 0.98, y: cy),
-                        CGPoint(x: cx - L * 1.30, y: cy + H * 1.05),
-                        CGPoint(x: cx - L * 1.18, y: cy),
-                        CGPoint(x: cx - L * 1.30, y: cy - H * 1.05)]
-            mass(p, tail, palette.lt(0.30), depth: 1, weight: u * 0.016, spacing: u * 0.022,
-                 strength: 0.30, seed: seed &+ 11)
-            // dorsal fin
-            var fin: [CGPoint] = []
-            for j in 0...9 {
-                let t = Double(j) / 9.0
-                fin.append(CGPoint(x: cx - L * 0.35 + t * L * 0.85,
-                                   y: cy + H * (0.75 + (j % 2 == 0 ? 0.50 : 0.28))))
-            }
-            fin.append(CGPoint(x: cx + L * 0.50, y: cy + H * 0.6))
-            fin.append(CGPoint(x: cx - L * 0.35, y: cy + H * 0.6))
-            mass(p, fin, palette.lt(0.34), depth: 1, weight: u * 0.013, spacing: u * 0.022,
-                 strength: 0.26, seed: seed &+ 13)
-            // head, gill and eye
-            penStroke(p, [CGPoint(x: cx + L * 0.52, y: cy + H * 0.75),
-                          CGPoint(x: cx + L * 0.46, y: cy),
-                          CGPoint(x: cx + L * 0.54, y: cy - H * 0.72)],
-                      weight: u * 0.017, colour: Ink.sepia, wobble: u * 0.004,
-                      taper: true, seed: seed &+ 17)
-            p.disc(cx + L * 0.78, cy + H * 0.22, u * 0.048, Ink.paper.al(0.85))
-            p.disc(cx + L * 0.78, cy + H * 0.22, u * 0.028, Ink.sepia)
-            let eye = ellipsePoints(cx: cx + L * 0.78, cy: cy + H * 0.22, rx: u * 0.050,
-                                    ry: u * 0.050, steps: 18)
-            penStroke(p, eye + [eye[0]], weight: u * 0.010, colour: Ink.sepia,
-                      wobble: 0.3, taper: false, seed: seed &+ 19)
+            inkOver(p, body, weight: u * 0.013, seed: seed &+ 9)
+            // head details
+            penStroke(p, [pnt(cx + L * 0.55, cy + u * 0.08 + H * 0.7),
+                          pnt(cx + L * 0.48, cy + u * 0.08),
+                          pnt(cx + L * 0.56, cy + u * 0.08 - H * 0.6)],
+                      weight: u * 0.012, colour: Ink.sepia, wobble: 0.4, taper: true,
+                      seed: seed &+ 13)
+            p.disc(cx + L * 0.76, cy + u * 0.08 + H * 0.25, u * 0.030, Paint.creamWhite)
+            p.disc(cx + L * 0.76, cy + u * 0.08 + H * 0.25, u * 0.016, Ink.sepia)
 
         case "shellfish":
-            // two fan shells and a prawn curled between them
-            for k in 0..<2 {
-                let sx = cx + (k == 0 ? -1.0 : 1.0) * bed.rx * 0.44 * sc
-                let sy = cy + (k == 0 ? 0.22 : -0.16) * bed.ry * sc
-                let r = u * 0.30 * sc
-                var fan: [CGPoint] = [CGPoint(x: sx, y: sy - r * 0.8)]
-                for j in 0...16 {
-                    let a = -.pi * 0.10 + Double(j) / 16.0 * .pi * 1.20
-                    fan.append(CGPoint(x: sx + cos(a) * r, y: sy - r * 0.8 + sin(a) * r * 1.15))
-                }
-                mass(p, fan, Ink.blush.mix(palette, 0.35), depth: 2, weight: u * 0.016,
-                     spacing: u * 0.024, strength: 0.36, seed: seed &+ UInt64(k * 23))
-                for j in 0...8 {
-                    let a = -.pi * 0.06 + Double(j) / 8.0 * .pi * 1.12
-                    penStroke(p, [CGPoint(x: sx, y: sy - r * 0.78),
-                                  CGPoint(x: sx + cos(a) * r * 0.96,
-                                          y: sy - r * 0.8 + sin(a) * r * 1.10)],
-                              weight: u * 0.010, colour: Ink.sepiaSoft.al(0.6),
-                              wobble: 0.3, taper: true, seed: seed &+ UInt64(k * 31 + j))
-                }
+            // prawns curled over each other, one shell behind
+            let shellX = cx - bed.rx * 0.45
+            let shellY = cy + u * 0.16
+            var fan: [CGPoint] = [pnt(shellX, shellY)]
+            for j in 0...12 {
+                let a = Double.pi * 0.15 + Double(j) / 12.0 * Double.pi * 0.7
+                fan.append(pnt(shellX + cos(a) * u * 0.27, shellY + sin(a) * u * 0.24))
             }
-            do {
-                let r = u * 0.34 * sc
-                var prawn: [CGPoint] = []
-                for j in 0...18 {
-                    let a = .pi * 0.15 + Double(j) / 18.0 * .pi * 1.5
-                    prawn.append(CGPoint(x: cx + cos(a) * r, y: cy + sin(a) * r * 0.9))
+            gouacheForm(p, fan, Chord(shadow: Paint.chord("blush").shadow,
+                                      body: Paint.chord("blush").body.lt(0.1),
+                                      light: Paint.chord("blush").light),
+                        seed: seed &+ 3)
+            for j in 0...6 {
+                let a = Double.pi * 0.18 + Double(j) / 6.0 * Double.pi * 0.64
+                penStroke(p, [pnt(shellX, shellY),
+                              pnt(shellX + cos(a) * u * 0.21, shellY + sin(a) * u * 0.19)],
+                          weight: u * 0.008, colour: Ink.sepia.al(0.6), wobble: 0.3,
+                          taper: true, seed: seed &+ UInt64(j * 13))
+            }
+            for k in 0..<3 {
+                let px = cx - bed.rx * 0.1 + Double(k) * bed.rx * 0.38
+                let py = cy + Double(k % 2) * u * 0.10
+                var curl: [CGPoint] = []
+                for j in 0...16 {
+                    let a = Double.pi * 1.1 - Double(j) / 16.0 * Double.pi * 1.35
+                    let r = u * (0.20 - Double(j) * 0.005)
+                    curl.append(pnt(px + cos(a) * r, py + u * 0.12 + sin(a) * r * 0.9))
                 }
-                for j in stride(from: 18, through: 0, by: -1) {
-                    let a = .pi * 0.15 + Double(j) / 18.0 * .pi * 1.5
-                    let rr = r - u * 0.115 * (0.5 + 0.5 * Double(j) / 18.0)
-                    prawn.append(CGPoint(x: cx + cos(a) * rr, y: cy + sin(a) * rr * 0.9))
-                }
-                mass(p, prawn, Ink.blush, depth: 2, weight: u * 0.016, spacing: u * 0.022,
-                     strength: 0.44, seed: seed &+ 61)
-                for j in 0...6 {
-                    let a = .pi * 0.25 + Double(j) / 6.0 * .pi * 1.25
-                    penStroke(p, [CGPoint(x: cx + cos(a) * r * 1.0, y: cy + sin(a) * r * 0.9),
-                                  CGPoint(x: cx + cos(a) * (r - u * 0.115),
-                                          y: cy + sin(a) * (r - u * 0.115) * 0.9)],
-                              weight: u * 0.011, colour: Ink.rust.al(0.75),
-                              wobble: 0.3, taper: true, seed: seed &+ UInt64(j * 13))
+                penStroke(p, curl, weight: u * 0.055, colour: Paint.chord("blush").body,
+                          wobble: u * 0.003, taper: true, seed: seed &+ UInt64(k * 19))
+                penStroke(p, curl, weight: u * 0.020, colour: Paint.chord("blush").light,
+                          wobble: u * 0.002, taper: true, seed: seed &+ UInt64(k * 23))
+                for j in 1...5 {
+                    let idx = j * 2
+                    if idx < curl.count - 1 {
+                        penStroke(p, [curl[idx], CGPoint(x: curl[idx].x, y: curl[idx].y - CGFloat(u * 0.03))],
+                                  weight: u * 0.008, colour: Paint.chord("rust").body.al(0.8),
+                                  wobble: 0.3, taper: true, seed: seed &+ UInt64(k * 31 + j))
+                    }
                 }
             }
 
         case "saladHeap":
-            for k in 0..<16 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.45)
-                let lx = cx + cos(a) * bed.rx * 0.72 * rr * sc
-                let ly = cy + sin(a) * bed.ry * 0.66 * rr * sc
-                let lr = u * rng.r(0.14, 0.26) * sc
-                let tilt = rng.r(0, 6.283)
-                var leaf: [CGPoint] = []
-                for j in 0..<20 {
-                    let t = Double(j) / 20.0 * 6.283185
-                    let ruffle = 1.0 + 0.20 * sin(t * 5)
-                    let px = cos(t) * lr * 1.15 * ruffle
-                    let py = sin(t) * lr * 0.68 * ruffle
-                    leaf.append(CGPoint(x: lx + px * cos(tilt) - py * sin(tilt),
-                                        y: ly + px * sin(tilt) + py * cos(tilt)))
+            let mound = heapPoints(cx: cx, cy: cy, rx: bed.rx * 0.78 * sc,
+                                   height: u * 0.26 * sc, rough: 0.12, seed: seed &+ 3)
+            gouache(p, mound, Paint.herbGreen.dk(0.08), unevenness: 0.10, seed: seed &+ 5)
+            p.clip(polyPath(mound)) {
+                for k in 0..<26 {
+                    let a = rng.r(0, 6.283)
+                    let rr = pow(rng.d(), 0.6)
+                    let lx = cx + cos(a) * bed.rx * 0.62 * rr
+                    let ly = cy + u * 0.15 + sin(a) * u * 0.16 * rr
+                    let leafTone = [Paint.herbGreen, Paint.herbGreen.lt(0.2),
+                                    Paint.herbDark, chord.body][rng.i(0, 3)]
+                    dab(p, x: lx, y: ly, rx: u * rng.r(0.045, 0.08),
+                        ry: u * rng.r(0.02, 0.045), leafTone, tilt: rng.r(0, 3.1),
+                        outline: u * 0.005, seed: seed &+ UInt64(k * 17))
                 }
-                let tone = rng.chance(0.25) ? palette : Ink.herb.lt(rng.r(0, 0.28))
-                mass(p, leaf, tone, depth: 1, weight: u * 0.012, spacing: u * 0.022,
-                     strength: 0.36, seed: seed &+ UInt64(k * 17))
-                penStroke(p, [CGPoint(x: lx - cos(tilt) * lr, y: ly - sin(tilt) * lr),
-                              CGPoint(x: lx + cos(tilt) * lr, y: ly + sin(tilt) * lr)],
-                          weight: u * 0.010, colour: Ink.sepiaSoft.al(0.55),
-                          wobble: 0.4, taper: true, seed: seed &+ UInt64(k * 7))
             }
+            inkOver(p, mound, weight: u * 0.012, seed: seed &+ 7)
 
         case "rollSlices":
-            let n = rng.i(5, 6)
+            let n = 5
             for k in 0..<n {
-                let a = Double(k) / Double(n) * 6.283185 + 0.3
-                let dx = cx + cos(a) * bed.rx * 0.50 * sc
-                let dy = cy + sin(a) * bed.ry * 0.46 * sc
-                let r = u * 0.23 * sc
-                let outer = jitterRing(dx, dy, r, r * 0.94, rough: 0.05, steps: 22,
-                                       seed: seed &+ UInt64(k * 13))
-                mass(p, outer, Ink.cream, depth: 2, weight: u * 0.016, spacing: u * 0.024,
-                     strength: 0.28, seed: seed &+ UInt64(k * 19))
-                // the dark wrapper and the core
-                penStroke(p, outer + [outer[0]], weight: u * 0.026,
-                          colour: Ink.char.mix(Ink.herb, 0.35).al(0.85),
-                          wobble: u * 0.004, taper: false, seed: seed &+ UInt64(k * 5))
-                let core = jitterRing(dx, dy, r * 0.42, r * 0.40, rough: 0.10, steps: 16,
-                                      seed: seed &+ UInt64(k * 29))
-                mass(p, core, palette, depth: 1, weight: u * 0.012, spacing: u * 0.020,
-                     strength: 0.52, seed: seed &+ UInt64(k * 31))
-                // grains of rice around the core
-                p.clip(polyPath(outer)) {
-                    for j in 0..<40 {
-                        let ga = rng.r(0, 6.283), grr = rng.r(0.45, 0.95)
-                        let gx = dx + cos(ga) * r * grr, gy = dy + sin(ga) * r * grr
-                        let gl = u * 0.020
-                        let gd = rng.r(0, 3.14)
-                        penStroke(p, [CGPoint(x: gx - cos(gd) * gl, y: gy - sin(gd) * gl),
-                                      CGPoint(x: gx + cos(gd) * gl, y: gy + sin(gd) * gl)],
-                                  weight: u * 0.009, colour: Ink.sepiaSoft.al(0.30),
-                                  wobble: 0.2, taper: true, seed: seed &+ UInt64(j))
-                    }
+                let back = k >= 3
+                let t = back ? Double(k - 3) : Double(k)
+                let count = back ? 2.0 : 3.0
+                let dx = cx - bed.rx * 0.55 + bed.rx * 1.1 * (t + 0.5) / count
+                let dy = cy + (back ? u * 0.22 : 0.0)
+                let r = u * (back ? 0.17 : 0.21) * sc
+                // standing cylinder slice: pale disc, dark wrapper ring, centre
+                let face = ringPoints(dx, dy + r, r, r * 0.94, steps: 24)
+                gouache(p, face, Paint.creamWhite.dk(0.04), seed: seed &+ UInt64(k * 13))
+                penStroke(p, face + [face[0]], weight: u * 0.024,
+                          colour: Paint.herbDark.dk(0.25), wobble: u * 0.003,
+                          taper: false, seed: seed &+ UInt64(k * 17))
+                dab(p, x: dx, y: dy + r, rx: r * 0.42, ry: r * 0.40, chord.body,
+                    outline: u * 0.006, seed: seed &+ UInt64(k * 19))
+                for j in 0..<8 {
+                    let a = Double(j) / 8.0 * 6.283
+                    dab(p, x: dx + cos(a) * r * 0.66, y: dy + r + sin(a) * r * 0.62,
+                        rx: u * 0.012, ry: u * 0.006, Paint.creamWhite.dk(0.14),
+                        tilt: a, seed: seed &+ UInt64(k * 29 + j))
                 }
             }
 
         case "wrappedParcel":
-            let L = bed.rx * 0.74 * sc, H = bed.ry * 0.52 * sc
-            var tube: [CGPoint] = []
-            for j in 0...24 {
-                let t = Double(j) / 24.0
-                tube.append(CGPoint(x: cx - L + 2 * L * t, y: cy + H * (0.92 + 0.10 * sin(t * 6))))
+            let L = bed.rx * 0.66 * sc
+            let H = u * 0.26 * sc
+            let parcel = lumpPoints(cx: cx, cy: cy + H * 0.5, rx: L, ry: H,
+                                    squash: 0.4, seed: seed &+ 3)
+            gouacheForm(p, parcel, Paint.leafGreen, seed: seed &+ 5)
+            // tie and fold lines
+            penStroke(p, [pnt(cx - L * 0.05, cy - H * 0.3), pnt(cx + L * 0.02, cy + H * 1.35)],
+                      weight: u * 0.014, colour: Paint.bamboo.shadow, wobble: 0.5,
+                      taper: false, seed: seed &+ 7)
+            for j in 0..<4 {
+                let t = -0.6 + Double(j) * 0.4
+                penStroke(p, [pnt(cx + t * L, cy + H * 1.3), pnt(cx + t * L + L * 0.14, cy - H * 0.1)],
+                          weight: u * 0.009, colour: Paint.leafGreen.shadow.al(0.8),
+                          wobble: 0.4, taper: true, seed: seed &+ UInt64(j * 11))
             }
-            tube.append(CGPoint(x: cx + L * 1.04, y: cy))
-            for j in stride(from: 24, through: 0, by: -1) {
-                let t = Double(j) / 24.0
-                tube.append(CGPoint(x: cx - L + 2 * L * t, y: cy - H * (0.92 + 0.10 * sin(t * 5))))
-            }
-            tube.append(CGPoint(x: cx - L * 1.04, y: cy))
-            mass(p, tube, Ink.cream.mix(palette, 0.22), depth: 2, weight: u * 0.020,
-                 spacing: u * 0.028, strength: 0.34, seed: seed &+ 5)
-            // the folds along the seam
-            for j in 0..<5 {
-                let t = 0.15 + Double(j) / 4.0 * 0.7
-                let x = cx - L + 2 * L * t
-                penStroke(p, [CGPoint(x: x, y: cy - H * 0.85),
-                              CGPoint(x: x + L * 0.06, y: cy + H * 0.88)],
-                          weight: u * 0.013, colour: Ink.sepiaSoft.al(0.65),
-                          wobble: u * 0.004, taper: true, seed: seed &+ UInt64(j * 11))
-            }
-            // the open end showing what is inside
-            let open = ellipsePoints(cx: cx + L * 0.92, cy: cy, rx: H * 0.44, ry: H * 0.92, steps: 20)
-            mass(p, open, palette.dk(0.10), depth: 2, weight: u * 0.014, spacing: u * 0.020,
-                 strength: 0.55, seed: seed &+ 23)
-            for j in 0..<5 {
-                let a = rng.r(0, 6.283)
-                penStroke(p, [CGPoint(x: cx + L * 0.92, y: cy),
-                              CGPoint(x: cx + L * 0.92 + cos(a) * H * 0.36,
-                                      y: cy + sin(a) * H * 0.74)],
-                          weight: u * 0.012, colour: Ink.herb.dk(0.10).al(0.8),
-                          wobble: 0.4, taper: true, seed: seed &+ UInt64(j * 7))
-            }
+            inkOver(p, parcel, weight: u * 0.013, seed: seed &+ 9)
+            // filling spilling from the open end
+            let open = ringPoints(cx + L * 0.82, cy + H * 0.5, H * 0.5, H * 0.62, steps: 18)
+            gouache(p, open, chord.body, seed: seed &+ 11)
+            penContour(p, open, weight: u * 0.010, colour: Ink.sepia.al(0.8), seed: seed &+ 13)
 
         case "layeredSlice":
-            let hw = bed.rx * 0.62 * sc, hh = bed.ry * 0.60 * sc
-            let apex = CGPoint(x: cx - hw, y: cy + hh * 0.10)
+            let hw = bed.rx * 0.50 * sc
+            let hh = u * 0.46 * sc
             let strata = 5
             for k in 0..<strata {
-                let y0 = cy - hh + Double(k) / Double(strata) * hh * 2
-                let y1 = cy - hh + Double(k + 1) / Double(strata) * hh * 2
-                let quad = [CGPoint(x: apex.x + hw * 0.30, y: y0),
-                            CGPoint(x: cx + hw, y: y0 + hh * 0.06),
-                            CGPoint(x: cx + hw, y: y1 + hh * 0.06),
-                            CGPoint(x: apex.x + hw * 0.30, y: y1)]
-                let tone: Col = k % 2 == 0 ? palette : Ink.cream.mix(palette, 0.25)
-                wash(p, quad, tone, strength: 0.44, bleed: u * 0.014, seed: seed &+ UInt64(k * 13))
-                hatch(p, polyPath(quad), angle: k % 2 == 0 ? 0.5 : 2.4,
-                      spacing: max(2.4, u * 0.040), weight: u * 0.010,
-                      colour: Ink.sepiaSoft.al(k % 2 == 0 ? 0.34 : 0.20),
-                      coverage: 0.8, seed: seed &+ UInt64(k * 17))
-                penContour(p, quad, weight: u * 0.013, colour: Ink.sepiaSoft.al(0.8),
-                           seed: seed &+ UInt64(k * 19))
+                let y0 = cy + Double(k) / Double(strata) * hh
+                let y1 = cy + Double(k + 1) / Double(strata) * hh
+                let quad = [pnt(cx - hw, y0), pnt(cx + hw, y0),
+                            pnt(cx + hw, y1), pnt(cx - hw, y1)]
+                gouache(p, quad, k % 2 == 0 ? chord.body : Paint.creamWhite.dk(0.05),
+                        unevenness: 0.05, seed: seed &+ UInt64(k * 13))
             }
-            // the cut face and the top crust
-            penStroke(p, [CGPoint(x: apex.x + hw * 0.30, y: cy - hh),
-                          CGPoint(x: apex.x + hw * 0.30, y: cy + hh)],
-                      weight: u * 0.022, colour: Ink.sepia, wobble: u * 0.004,
-                      taper: false, seed: seed &+ 41)
-            penStroke(p, [CGPoint(x: apex.x + hw * 0.30, y: cy + hh),
-                          CGPoint(x: cx + hw, y: cy + hh + hh * 0.06)],
-                      weight: u * 0.024, colour: Ink.umber, wobble: u * 0.005,
-                      taper: false, seed: seed &+ 43)
+            // the top crust and a dusting
+            gouache(p, [pnt(cx - hw, cy + hh), pnt(cx + hw, cy + hh),
+                        pnt(cx + hw * 0.96, cy + hh + u * 0.04),
+                        pnt(cx - hw * 0.96, cy + hh + u * 0.04)],
+                    chord.shadow, seed: seed &+ 31)
+            let whole = [pnt(cx - hw, cy), pnt(cx + hw, cy),
+                         pnt(cx + hw, cy + hh + u * 0.04), pnt(cx - hw, cy + hh + u * 0.04)]
+            inkOver(p, whole, weight: u * 0.013, hatchShadow: false, seed: seed &+ 33)
+            for k in 0..<10 {
+                p.disc(cx + rng.r(-0.9, 0.9) * hw, cy + hh + u * rng.r(0.05, 0.10),
+                       u * rng.r(0.004, 0.008), Paint.creamWhite.al(0.9))
+                _ = k
+            }
 
         case "grillMarks":
-            let hw = bed.rx * 0.76 * sc, hh = bed.ry * 0.52 * sc
-            let slab = jitterRing(cx, cy, hw, hh, rough: 0.06, steps: 26, seed: seed &+ 3)
-            mass(p, slab, palette.dk(0.12), depth: 3, weight: u * 0.022, spacing: u * 0.026,
-                 strength: 0.52, seed: seed &+ 5)
+            let hw = bed.rx * 0.78 * sc
+            let hh = u * 0.26 * sc
+            let slab = lumpPoints(cx: cx, cy: cy + hh * 0.4, rx: hw, ry: hh,
+                                  squash: 0.45, seed: seed &+ 3)
+            gouacheForm(p, slab, chord, depth: 1.1, seed: seed &+ 5)
             p.clip(polyPath(slab)) {
                 for k in 0..<5 {
-                    let t = -0.8 + Double(k) / 4.0 * 1.6
-                    penStroke(p, [CGPoint(x: cx + t * hw - hw * 0.5, y: cy - hh * 1.1),
-                                  CGPoint(x: cx + t * hw + hw * 0.5, y: cy + hh * 1.1)],
-                              weight: u * 0.052, colour: Ink.char.al(0.72),
-                              wobble: u * 0.006, taper: false, seed: seed &+ UInt64(k * 11))
-                }
-                for k in 0..<3 {
-                    let t = -0.6 + Double(k) / 2.0 * 1.2
-                    penStroke(p, [CGPoint(x: cx - hw * 1.1, y: cy + t * hh + hh * 0.35),
-                                  CGPoint(x: cx + hw * 1.1, y: cy + t * hh - hh * 0.35)],
-                              weight: u * 0.040, colour: Ink.char.al(0.48),
-                              wobble: u * 0.006, taper: false, seed: seed &+ UInt64(k * 17))
+                    let t = -0.7 + Double(k) * 0.35
+                    penStroke(p, [pnt(cx + t * hw - hw * 0.25, cy - hh * 0.5),
+                                  pnt(cx + t * hw + hw * 0.25, cy + hh * 1.3)],
+                              weight: u * 0.032, colour: Paint.charBrown.al(0.85),
+                              wobble: u * 0.003, taper: false, seed: seed &+ UInt64(k * 11))
                 }
             }
-            sheen(p, cx: cx, cy: cy, rx: hw, ry: hh, seed: seed)
+            inkOver(p, slab, weight: u * 0.014, seed: seed &+ 7)
+            // juice pooling at the base
+            let juice = ringPoints(cx + hw * 0.2, cy - hh * 0.15, hw * 0.5, u * 0.030, steps: 20)
+            gouache(p, juice, Paint.sauceDark.al(0.85), edgeDark: 0.04, seed: seed &+ 9)
 
         case "friedPieces":
-            let n = rng.i(5, 7)
+            let n = rng.i(5, 6)
             for k in 0..<n {
-                let a = Double(k) / Double(n) * 6.283185 + rng.r(-0.3, 0.3)
-                let rr = rng.r(0.15, 0.60)
-                let fx = cx + cos(a) * bed.rx * rr * sc
-                let fy = cy + sin(a) * bed.ry * rr * sc
-                let fr = u * rng.r(0.16, 0.26) * sc
-                // a knobbly, crusted outline — the crust IS the shape
+                let t = Double(k) / Double(max(1, n - 1))
+                let back = k % 2 == 1
+                let fx = cx - bed.rx * 0.6 + bed.rx * 1.2 * t
+                let fy = cy + (back ? u * 0.18 : 0) + rng.r(0, u * 0.04)
+                let r = u * rng.r(0.14, 0.18) * sc
                 var piece: [CGPoint] = []
-                for j in 0..<30 {
-                    let t = Double(j) / 30.0 * 6.283185
-                    let knob = 1.0 + 0.20 * sin(t * rng.r(4, 7)) + rng.r(-0.09, 0.09)
-                    piece.append(CGPoint(x: fx + cos(t) * fr * knob,
-                                         y: fy + sin(t) * fr * knob * 0.86))
+                for j in 0..<18 {
+                    let a = Double(j) / 18.0 * 6.283185
+                    let knob = 1.0 + 0.16 * sin(a * 5 + Double(k)) + rng.r(-0.06, 0.06)
+                    let vert = sin(a) > 0 ? 1.0 : 0.6
+                    piece.append(pnt(fx + cos(a) * r * knob, fy + r * 0.5 + sin(a) * r * knob * vert))
                 }
-                mass(p, piece, Ink.ochre.mix(palette, 0.35), depth: 2, weight: u * 0.016,
-                     spacing: u * 0.024, strength: 0.44, seed: seed &+ UInt64(k * 23))
-                stipple(p, polyPath(piece), density: 0.0035, sizeMin: u * 0.006,
-                        sizeMax: u * 0.016, colour: Ink.umber.al(0.55), seed: seed &+ UInt64(k * 29))
-                sheen(p, cx: fx, cy: fy, rx: fr, ry: fr * 0.8, seed: seed)
+                gouacheForm(p, piece, Chord(shadow: Paint.chord("ochre").shadow,
+                                            body: Paint.chord("ochre").body,
+                                            light: Paint.saffron.lt(0.15)),
+                            seed: seed &+ UInt64(k * 17))
+                p.clip(polyPath(piece)) {
+                    for j in 0..<10 {
+                        p.disc(fx + rng.r(-0.7, 0.7) * r, fy + r * 0.5 + rng.r(-0.6, 0.7) * r,
+                               u * rng.r(0.004, 0.009), Paint.chord("umber").body.al(0.6))
+                        _ = j
+                    }
+                }
+                inkOver(p, piece, weight: u * 0.011, seed: seed &+ UInt64(k * 23))
             }
 
         case "eggDish":
-            let n = rng.i(1, 2)
-            for k in 0..<n {
-                let ex = cx + (n == 1 ? 0 : (Double(k) - 0.5) * bed.rx * 0.62 * sc)
-                let ey = cy + (n == 1 ? 0 : (Double(k) - 0.5) * bed.ry * 0.24 * sc)
-                let white = jitterRing(ex, ey, bed.rx * 0.46 * sc, bed.ry * 0.40 * sc,
-                                       rough: 0.16, steps: 28, seed: seed &+ UInt64(k * 13))
-                wash(p, white, Ink.cream.lt(0.35), strength: 0.26, bleed: u * 0.020,
-                     seed: seed &+ UInt64(k * 17))
-                penContour(p, white, weight: u * 0.014, colour: Ink.sepiaSoft.al(0.65),
-                           seed: seed &+ UInt64(k * 19))
-                let yr = u * 0.20 * sc
-                let yolk = ellipsePoints(cx: ex, cy: ey, rx: yr, ry: yr * 0.92, steps: 24)
-                mass(p, yolk, Ink.saffron, depth: 2, weight: u * 0.016, spacing: u * 0.022,
-                     strength: 0.62, seed: seed &+ UInt64(k * 23))
-                p.ellipse(ex - yr * 0.28, ey + yr * 0.28, yr * 0.26, yr * 0.20, Ink.paper.al(0.42))
-            }
+            let white = lumpPoints(cx: cx, cy: cy + u * 0.05, rx: bed.rx * 0.62 * sc,
+                                   ry: u * 0.13, squash: 0.5, seed: seed &+ 3)
+            gouacheForm(p, white, Chord(shadow: Paint.creamWhite.dk(0.16),
+                                        body: Paint.creamWhite,
+                                        light: Col(r: 1, g: 0.99, b: 0.97)),
+                        depth: 0.6, seed: seed &+ 5)
+            inkOver(p, white, weight: u * 0.011, hatchShadow: false, seed: seed &+ 7)
+            let yr = u * 0.14 * sc
+            let yolk = ringPoints(cx - bed.rx * 0.05, cy + u * 0.10, yr, yr * 0.72, steps: 22)
+            gouacheForm(p, yolk, Chord(shadow: Paint.chord("amber").body,
+                                       body: Paint.saffron,
+                                       light: Paint.saffron.lt(0.25)),
+                        seed: seed &+ 9)
+            penContour(p, yolk, weight: u * 0.009, colour: Ink.sepia.al(0.7), seed: seed &+ 11)
+            p.disc(cx - bed.rx * 0.05 - yr * 0.3, cy + u * 0.10 + yr * 0.25,
+                   yr * 0.20, Paint.creamWhite.al(0.9))
 
         case "porridge":
-            let heap = jitterRing(cx, cy, bed.rx * 0.80 * sc, bed.ry * 0.74 * sc,
-                                  rough: 0.06, steps: 30, seed: seed &+ 3)
-            mass(p, heap, palette.lt(0.18), depth: 2, weight: u * 0.020, spacing: u * 0.028,
-                 strength: 0.40, seed: seed &+ 5)
-            p.clip(polyPath(heap)) {
-                // the drag of a spoon through it
-                for k in 0..<7 {
+            let mound = heapPoints(cx: cx, cy: cy, rx: bed.rx * 0.80 * sc,
+                                   height: u * 0.17 * sc, rough: 0.05, seed: seed &+ 3)
+            gouacheForm(p, mound, Chord(shadow: chord.shadow.lt(0.05),
+                                        body: chord.body.lt(0.14),
+                                        light: chord.light.lt(0.1)),
+                        depth: 0.7, seed: seed &+ 5)
+            p.clip(polyPath(mound)) {
+                for k in 0..<5 {
                     var drag: [CGPoint] = []
-                    let a0 = rng.r(0, 6.283)
-                    for j in 0...12 {
-                        let t = Double(j) / 12.0
-                        let a = a0 + t * 1.6
-                        let r = bed.rx * (0.12 + t * 0.60) * sc
-                        drag.append(CGPoint(x: cx + cos(a) * r, y: cy + sin(a) * r * 0.9))
+                    let y0 = cy + u * rng.r(0.04, 0.18)
+                    for j in 0...14 {
+                        let t = Double(j) / 14.0
+                        drag.append(pnt(cx - bed.rx * 0.7 + bed.rx * 1.4 * t,
+                                        y0 + sin(t * 5 + Double(k)) * u * 0.02))
                     }
-                    penStroke(p, drag, weight: u * 0.026, colour: Ink.sepiaSoft.al(rng.r(0.25, 0.5)),
-                              wobble: u * 0.006, taper: true, seed: seed &+ UInt64(k * 11))
+                    penStroke(p, drag, weight: u * 0.018,
+                              colour: chord.shadow.al(rng.r(0.3, 0.5)),
+                              wobble: u * 0.004, taper: true, seed: seed &+ UInt64(k * 11))
                 }
-                stipple(p, polyPath(heap), density: 0.0016, sizeMin: u * 0.006,
-                        sizeMax: u * 0.014, colour: Ink.umber.al(0.35), seed: seed &+ 31)
             }
+            inkOver(p, mound, weight: u * 0.012, seed: seed &+ 7)
+            // a butter pool on top
+            let melt = ringPoints(cx, cy + u * 0.20, u * 0.10, u * 0.035, steps: 16)
+            gouache(p, melt, Paint.saffron.al(0.9), edgeDark: 0.06, seed: seed &+ 9)
 
         case "tacoFolds":
-            let n = rng.i(2, 3)
-            for k in 0..<n {
-                let tx = cx + (Double(k) - Double(n - 1) / 2) * bed.rx * 0.58 * sc
-                let ty = cy + (Double(k) - Double(n - 1) / 2) * bed.ry * 0.14 * sc
-                let r = u * 0.36 * sc
-                // a folded round seen end-on: a U of shell, filling heaped inside
+            for k in 0..<rng.i(2, 3) {
+                let back = k == 1
+                let tx = cx + (Double(k) - 0.5) * bed.rx * 0.52
+                let ty = cy + (back ? u * 0.16 : 0)
+                let r = u * (back ? 0.26 : 0.31) * sc
+                // the folded shell: a U seen from the end
                 var shell: [CGPoint] = []
-                for j in 0...18 {
-                    let a = .pi + Double(j) / 18.0 * .pi
-                    shell.append(CGPoint(x: tx + cos(a) * r, y: ty + sin(a) * r * 1.05))
+                for j in 0...16 {
+                    let a = Double.pi + Double(j) / 16.0 * Double.pi
+                    shell.append(pnt(tx + cos(a) * r, ty + r * 0.55 + sin(a) * r * 1.05))
                 }
-                for j in stride(from: 18, through: 0, by: -1) {
-                    let a = .pi + Double(j) / 18.0 * .pi
-                    shell.append(CGPoint(x: tx + cos(a) * r * 0.80, y: ty + sin(a) * r * 0.86))
+                for j in stride(from: 16, through: 0, by: -1) {
+                    let a = Double.pi + Double(j) / 16.0 * Double.pi
+                    shell.append(pnt(tx + cos(a) * r * 0.82, ty + r * 0.55 + sin(a) * r * 0.80))
                 }
-                mass(p, shell, Ink.ochre.mix(palette, 0.20), depth: 2, weight: u * 0.018,
-                     spacing: u * 0.024, strength: 0.38, seed: seed &+ UInt64(k * 19))
-                // filling spilling over the lip
-                for j in 0..<9 {
-                    let fx = tx + rng.r(-0.75, 0.75) * r
-                    let fy = ty + rng.r(-0.05, 0.30) * r
-                    let fr = u * rng.r(0.045, 0.085)
-                    let bit = jitterRing(fx, fy, fr, fr * 0.8, rough: 0.28, steps: 12,
-                                         seed: seed &+ UInt64(k * 41 + j))
-                    mass(p, bit, j % 3 == 0 ? Ink.herb : palette, depth: 1, weight: u * 0.010,
-                         spacing: u * 0.018, strength: 0.5, seed: seed &+ UInt64(j * 7))
+                gouacheForm(p, shell, Chord(shadow: Paint.chord("ochre").shadow,
+                                            body: Paint.chord("ochre").body.lt(0.06),
+                                            light: Paint.chord("ochre").light),
+                            seed: seed &+ UInt64(k * 19))
+                // filling above the fold line
+                for j in 0..<7 {
+                    let fx = tx + rng.r(-0.6, 0.6) * r
+                    let fy = ty + r * 0.55 + rng.r(0.0, 0.35) * r
+                    let tone = [chord.body, Paint.herbGreen, Paint.chiliRed,
+                                Paint.creamWhite][rng.i(0, 3)]
+                    dab(p, x: fx, y: fy, rx: u * rng.r(0.025, 0.045),
+                        ry: u * rng.r(0.015, 0.028), tone, tilt: rng.r(0, 3.1),
+                        outline: u * 0.004, seed: seed &+ UInt64(k * 41 + j))
                 }
+                inkOver(p, shell, weight: u * 0.012, hatchShadow: false,
+                        seed: seed &+ UInt64(k * 23))
             }
 
         case "pancakeStack":
-            let n = rng.i(3, 4)
+            let n = 4
             for k in 0..<n {
-                let ry = bed.ry * 0.16 * sc
-                let cyk = cy - bed.ry * 0.28 * sc + Double(k) * ry * 1.55
-                let rx = bed.rx * (0.72 - Double(k) * 0.015) * sc
-                let disc = jitterRing(cx, cyk, rx, ry * 1.6, rough: 0.05, steps: 26,
-                                      seed: seed &+ UInt64(k * 13))
-                mass(p, disc, Ink.ochre.mix(palette, 0.25), depth: 2, weight: u * 0.018,
-                     spacing: u * 0.024, strength: 0.36, seed: seed &+ UInt64(k * 17))
-                // the browned face
-                stipple(p, polyPath(disc), density: 0.0020, sizeMin: u * 0.005,
-                        sizeMax: u * 0.013, colour: Ink.umber.al(0.42), seed: seed &+ UInt64(k * 23))
+                let ry = u * 0.068
+                let cyk = cy + Double(k) * ry * 1.5
+                let rx = bed.rx * (0.62 - Double(k) * 0.02) * sc
+                let disc = lumpPoints(cx: cx, cy: cyk + ry, rx: rx, ry: ry * 1.6,
+                                      squash: 0.55, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, disc, Chord(shadow: Paint.chord("ochre").shadow,
+                                           body: Paint.chord("ochre").body.lt(Double(k) * 0.02),
+                                           light: Paint.chord("ochre").light),
+                            depth: 0.6, seed: seed &+ UInt64(k * 17))
+                penContour(p, disc, weight: u * 0.010, colour: Ink.sepia.al(0.7),
+                           seed: seed &+ UInt64(k * 19))
             }
+            // syrup sliding down the stack
+            var syr: [CGPoint] = []
+            let topY = cy + Double(n - 1) * u * 0.055 * 1.5 + u * 0.09
+            for j in 0...10 {
+                let t = Double(j) / 10.0
+                syr.append(pnt(cx - bed.rx * 0.2 + sin(t * 5) * u * 0.03, topY - t * u * 0.20))
+            }
+            penStroke(p, syr, weight: u * 0.024, colour: Paint.sauceDark.al(0.85),
+                      wobble: u * 0.003, taper: true, seed: seed &+ 31)
+            let melt = ringPoints(cx, topY, u * 0.07, u * 0.025, steps: 14)
+            gouache(p, melt, Paint.saffron, edgeDark: 0.05, seed: seed &+ 33)
 
         case "pastryTart":
-            let rx = bed.rx * 0.82 * sc, ry = bed.ry * 0.76 * sc
-            let outer = ellipsePoints(cx: cx, cy: cy, rx: rx, ry: ry, steps: 60)
-            mass(p, outer, Ink.ochre.mix(Ink.cream, 0.35), depth: 2, weight: u * 0.020,
-                 spacing: u * 0.028, strength: 0.34, seed: seed &+ 5)
-            // crimped edge
-            aroundEllipse(cx, cy, rx * 0.97, ry * 0.97, count: 26) { i, _, pt, t in
-                let n = CGPoint(x: CGFloat(-sin(t)), y: CGFloat(cos(t)))
-                penStroke(p, [CGPoint(x: pt.x + n.x * CGFloat(u * 0.075),
-                                      y: pt.y + n.y * CGFloat(u * 0.075)),
-                              CGPoint(x: pt.x - n.x * CGFloat(u * 0.075),
-                                      y: pt.y - n.y * CGFloat(u * 0.075))],
-                          weight: u * 0.018, colour: Ink.umber.al(0.7), wobble: u * 0.004,
-                          taper: true, seed: seed &+ UInt64(i * 7))
+            let rx = bed.rx * 0.72 * sc
+            let ry = u * 0.15 * sc
+            // crimped wall
+            var wall: [CGPoint] = []
+            for j in 0...30 {
+                let a = Double.pi + Double(j) / 30.0 * Double.pi
+                let crimp = 1.0 + 0.05 * sin(Double(j) * 2.1)
+                wall.append(pnt(cx + cos(a) * rx * crimp, cy + sin(a) * ry))
             }
-            // the filling inside the shell
-            let fill = ellipsePoints(cx: cx, cy: cy, rx: rx * 0.74, ry: ry * 0.70, steps: 40)
-            mass(p, fill, palette, depth: 1, weight: u * 0.014, spacing: u * 0.024,
-                 strength: 0.50, seed: seed &+ 29)
-            p.clip(polyPath(fill)) {
-                for k in 0..<7 {
-                    let a = rng.r(0, 6.283), rr = rng.r(0.2, 0.85)
-                    let fx = cx + cos(a) * rx * 0.7 * rr, fy = cy + sin(a) * ry * 0.66 * rr
-                    let fr = u * rng.r(0.055, 0.10)
-                    let piece = jitterRing(fx, fy, fr, fr * 0.85, rough: 0.14, steps: 14,
-                                           seed: seed &+ UInt64(k * 31))
-                    mass(p, piece, palette.dk(0.16), depth: 1, weight: u * 0.010,
-                         spacing: u * 0.018, strength: 0.45, seed: seed &+ UInt64(k * 37))
-                }
+            for j in stride(from: 30, through: 0, by: -1) {
+                let a = Double.pi + Double(j) / 30.0 * Double.pi
+                wall.append(pnt(cx + cos(a) * rx * 0.98, cy + u * 0.10 + sin(a) * ry * 0.9))
+            }
+            gouacheForm(p, wall, Chord(shadow: Paint.chord("ochre").shadow,
+                                       body: Paint.chord("ochre").body,
+                                       light: Paint.chord("ochre").light),
+                        seed: seed &+ 3)
+            inkOver(p, wall, weight: u * 0.011, seed: seed &+ 5)
+            // the filling face
+            let fill = ringPoints(cx, cy + u * 0.10, rx * 0.86, ry * 0.85, steps: 30)
+            gouache(p, fill, chord.body, unevenness: 0.08, seed: seed &+ 7)
+            penStroke(p, fill + [fill[0]], weight: u * 0.010, colour: Ink.sepia.al(0.7),
+                      wobble: 0.4, taper: false, seed: seed &+ 9)
+            for k in 0..<6 {
+                let a = rng.r(0, 6.283)
+                let rr = rng.r(0.2, 0.8)
+                dab(p, x: cx + cos(a) * rx * 0.6 * rr, y: cy + u * 0.10 + sin(a) * ry * 0.6 * rr,
+                    rx: u * rng.r(0.025, 0.045), ry: u * rng.r(0.015, 0.028),
+                    chord.shadow, tilt: rng.r(0, 3.1), outline: u * 0.004,
+                    seed: seed &+ UInt64(k * 31))
             }
 
         case "scoop":
-            let n = rng.i(2, 3)
-            for k in 0..<n {
-                let a = Double(k) / Double(n) * 6.283185 + 0.6
-                let sx = cx + cos(a) * bed.rx * 0.34 * sc
-                let sy = cy + sin(a) * bed.ry * 0.30 * sc
-                let r = u * 0.30 * sc
-                let ball = jitterRing(sx, sy, r, r * 0.92, rough: 0.07, steps: 26,
-                                      seed: seed &+ UInt64(k * 13))
-                mass(p, ball, k == 0 ? palette : palette.lt(0.22), depth: 2, weight: u * 0.018,
-                     spacing: u * 0.024, strength: 0.44, seed: seed &+ UInt64(k * 17))
-                // the ridge a scoop leaves
+            for k in 0..<2 {
+                let sxp = cx + (Double(k) - 0.5) * bed.rx * 0.42
+                let syp = cy + Double(k) * u * 0.05
+                let r = u * 0.21 * sc
+                let ball = lumpPoints(cx: sxp, cy: syp + r * 0.6, rx: r, ry: r * 0.95,
+                                      squash: 0.5, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, ball,
+                            k == 0 ? chord : Chord(shadow: chord.shadow.lt(0.15),
+                                                   body: chord.body.lt(0.22),
+                                                   light: chord.light.lt(0.15)),
+                            seed: seed &+ UInt64(k * 17))
                 var ridge: [CGPoint] = []
-                for j in 0...14 {
-                    let t = Double(j) / 14.0
-                    let ang = .pi * 0.15 + t * .pi * 1.5
-                    ridge.append(CGPoint(x: sx + cos(ang) * r * (0.30 + t * 0.55),
-                                         y: sy + sin(ang) * r * (0.30 + t * 0.55) * 0.9))
+                for j in 0...10 {
+                    let t = Double(j) / 10.0
+                    let ang = Double.pi * 0.2 + t * Double.pi * 1.2
+                    ridge.append(pnt(sxp + cos(ang) * r * (0.3 + t * 0.5),
+                                     syp + r * 0.6 + sin(ang) * r * (0.3 + t * 0.5) * 0.9))
                 }
-                penStroke(p, ridge, weight: u * 0.020, colour: Ink.sepiaSoft.al(0.55),
-                          wobble: u * 0.005, taper: true, seed: seed &+ UInt64(k * 23))
-                sheen(p, cx: sx, cy: sy, rx: r, ry: r * 0.9, seed: seed)
+                penStroke(p, ridge, weight: u * 0.013, colour: chord.shadow.al(0.7),
+                          wobble: u * 0.003, taper: true, seed: seed &+ UInt64(k * 23))
+                inkOver(p, ball, weight: u * 0.011, hatchShadow: false, seed: seed &+ UInt64(k * 29))
             }
 
         case "cornCob":
-            let L = bed.rx * 0.82 * sc, H = bed.ry * 0.24 * sc
-            var cob: [CGPoint] = []
-            for j in 0...26 {
-                let t = Double(j) / 26.0
-                cob.append(CGPoint(x: cx - L + 2 * L * t, y: cy + H * sin(.pi * min(1, t * 1.08))))
-            }
-            for j in stride(from: 26, through: 0, by: -1) {
-                let t = Double(j) / 26.0
-                cob.append(CGPoint(x: cx - L + 2 * L * t, y: cy - H * sin(.pi * min(1, t * 1.08))))
-            }
-            mass(p, cob, Ink.saffron.mix(palette, 0.25), depth: 2, weight: u * 0.020,
-                 spacing: u * 0.026, strength: 0.42, seed: seed &+ 5)
+            let L = bed.rx * 0.78 * sc
+            let H = u * 0.16 * sc
+            let cob = lumpPoints(cx: cx, cy: cy + H, rx: L, ry: H, squash: 0.8, seed: seed &+ 3)
+            gouacheForm(p, cob, Chord(shadow: Paint.chord("amber").body,
+                                      body: Paint.saffron,
+                                      light: Paint.saffron.lt(0.2)),
+                        seed: seed &+ 5)
             p.clip(polyPath(cob)) {
                 var row = 0
-                var yy = cy - H
-                while yy < cy + H {
+                var yy = cy + H * 0.2
+                while yy < cy + H * 1.9 {
                     var xx = cx - L
                     while xx < cx + L {
-                        let k = ellipsePoints(cx: xx + Double(row % 2) * u * 0.045,
-                                              cy: yy, rx: u * 0.042, ry: u * 0.034, steps: 12)
-                        p.poly(k, Ink.saffron.lt(0.10).al(0.55))
-                        penContour(p, k, weight: u * 0.008, colour: Ink.umber.al(0.5),
-                                   seed: seed &+ u64(Int(xx) &+ Int(yy)))
-                        xx += u * 0.090
+                        dab(p, x: xx + Double(row % 2) * u * 0.018, y: yy,
+                            rx: u * 0.019, ry: u * 0.014,
+                            Paint.saffron.dk(Double(row % 3) * 0.04),
+                            outline: u * 0.0035, seed: seed &+ u64(Int(xx + yy)))
+                        xx += u * 0.038
                     }
-                    yy += u * 0.068
+                    yy += u * 0.030
                     row += 1
                 }
             }
+            inkOver(p, cob, weight: u * 0.012, seed: seed &+ 7)
+            // husk leaves pulled back
+            for side in [-1.0, 1.0] {
+                let husk = [pnt(cx + side * L * 0.95, cy + H),
+                            pnt(cx + side * L * 1.35, cy + H * 1.6),
+                            pnt(cx + side * L * 1.30, cy + H * 0.3)]
+                gouache(p, husk, Paint.leafGreen.body, seed: seed &+ u64(Int(side * 41)))
+                penContour(p, husk, weight: u * 0.009, colour: Ink.sepia.al(0.7),
+                           seed: seed &+ u64(Int(side * 47)))
+            }
 
         case "pickleFan":
-            let n = 7
-            for k in 0..<n {
-                let t = Double(k) / Double(n - 1) - 0.5
-                let sx = cx + t * bed.rx * 1.05 * sc
-                let sy = cy - abs(t) * bed.ry * 0.18 * sc
-                let r = u * 0.20 * sc
-                let slice = ellipsePoints(cx: sx, cy: sy, rx: r * 0.86, ry: r, steps: 22)
-                mass(p, slice, k % 2 == 0 ? palette : palette.lt(0.20), depth: 1,
-                     weight: u * 0.014, spacing: u * 0.020, strength: 0.42,
-                     seed: seed &+ UInt64(k * 13))
-                let inner = ellipsePoints(cx: sx, cy: sy, rx: r * 0.52, ry: r * 0.62, steps: 18)
-                penStroke(p, inner + [inner[0]], weight: u * 0.010,
-                          colour: Ink.sepiaSoft.al(0.55), wobble: 0.3, taper: false,
-                          seed: seed &+ UInt64(k * 17))
+            for k in 0..<6 {
+                let t = Double(k) / 5.0 - 0.5
+                let sxp = cx + t * bed.rx * 1.0 * sc
+                let syp = cy + u * 0.05 - abs(t) * u * 0.05
+                let r = u * 0.135 * sc
+                dab(p, x: sxp, y: syp + r * 0.5, rx: r * 0.8, ry: r,
+                    k % 2 == 0 ? chord.body : chord.light, tilt: t * 0.4,
+                    outline: u * 0.007, seed: seed &+ UInt64(k * 13))
+                dab(p, x: sxp, y: syp + r * 0.5, rx: r * 0.4, ry: r * 0.55,
+                    Paint.creamWhite.al(0.6), tilt: t * 0.4, seed: seed &+ UInt64(k * 17))
             }
 
         case "cubes":
             let n = rng.i(6, 8)
             for k in 0..<n {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.5)
-                let bx = cx + cos(a) * bed.rx * 0.62 * rr * sc
-                let by = cy + sin(a) * bed.ry * 0.56 * rr * sc
-                let s = u * rng.r(0.11, 0.16) * sc
-                let top = [CGPoint(x: bx, y: by + s * 0.62),
-                           CGPoint(x: bx + s, y: by + s * 0.20),
-                           CGPoint(x: bx, y: by - s * 0.22),
-                           CGPoint(x: bx - s, y: by + s * 0.20)]
-                let left = [top[3], top[2], CGPoint(x: bx, y: by - s * 0.95),
-                            CGPoint(x: bx - s, y: by - s * 0.52)]
-                let right = [top[2], top[1], CGPoint(x: bx + s, y: by - s * 0.52),
-                             CGPoint(x: bx, y: by - s * 0.95)]
-                wash(p, top, palette.lt(0.24), strength: 0.42, bleed: u * 0.008,
-                     seed: seed &+ UInt64(k * 7))
-                wash(p, left, palette.dk(0.10), strength: 0.46, bleed: u * 0.008,
-                     seed: seed &+ UInt64(k * 11))
-                wash(p, right, palette.dk(0.24), strength: 0.50, bleed: u * 0.008,
-                     seed: seed &+ UInt64(k * 13))
-                hatch(p, polyPath(right), angle: 1.2, spacing: max(2.0, u * 0.028),
-                      weight: u * 0.008, colour: Ink.sepiaSoft.al(0.45), coverage: 0.85,
-                      seed: seed &+ UInt64(k * 17))
-                for face in [top, left, right] {
-                    penContour(p, face, weight: u * 0.012, seed: seed &+ UInt64(k * 19))
+                let back = k % 2 == 1
+                let t = Double(k) / Double(max(1, n - 1))
+                let bx = cx - bed.rx * 0.6 + bed.rx * 1.2 * t + rng.r(-0.03, 0.03) * bed.rx
+                let by = cy + (back ? u * 0.16 : 0)
+                let s = u * rng.r(0.10, 0.13) * sc
+                let top = [pnt(bx, by + s * 1.5), pnt(bx + s, by + s * 1.1),
+                           pnt(bx, by + s * 0.7), pnt(bx - s, by + s * 1.1)]
+                let leftF = [top[3], top[2], pnt(bx, by), pnt(bx - s, by + s * 0.4)]
+                let rightF = [top[2], top[1], pnt(bx + s, by + s * 0.4), pnt(bx, by)]
+                gouache(p, leftF, chord.body.dk(0.06), seed: seed &+ UInt64(k * 7))
+                gouache(p, rightF, chord.shadow, seed: seed &+ UInt64(k * 11))
+                gouache(p, top, chord.light, seed: seed &+ UInt64(k * 13))
+                for face in [top, leftF, rightF] {
+                    penContour(p, face, weight: u * 0.008, colour: Ink.sepia.al(0.8),
+                               seed: seed &+ UInt64(k * 19))
                 }
             }
 
         case "meatSlab":
-            let hw = bed.rx * 0.56 * sc, hh = bed.ry * 0.48 * sc
-            let joint = jitterRing(cx - bed.rx * 0.20 * sc, cy, hw, hh, rough: 0.09, steps: 28,
+            // the joint behind, three carved slices fanned in front
+            let joint = lumpPoints(cx: cx - bed.rx * 0.25, cy: cy + u * 0.22,
+                                   rx: bed.rx * 0.48 * sc, ry: u * 0.24, squash: 0.5,
                                    seed: seed &+ 3)
-            mass(p, joint, palette.dk(0.14), depth: 3, weight: u * 0.022, spacing: u * 0.026,
-                 strength: 0.52, seed: seed &+ 5)
-            // three slices carved off and fanned
+            gouacheForm(p, joint, Chord(shadow: chord.shadow.dk(0.08),
+                                        body: chord.body.dk(0.08),
+                                        light: chord.light.dk(0.04)),
+                        depth: 1.1, seed: seed &+ 5)
+            inkOver(p, joint, weight: u * 0.013, seed: seed &+ 7)
             for k in 0..<3 {
-                let sx = cx + bed.rx * (0.24 + Double(k) * 0.20) * sc
-                let sy = cy - bed.ry * (0.06 + Double(k) * 0.10) * sc
-                let slice = jitterRing(sx, sy, hw * 0.52, hh * 0.62, rough: 0.08, steps: 22,
-                                       seed: seed &+ UInt64(k * 13))
-                mass(p, slice, palette.lt(0.10), depth: 2, weight: u * 0.016,
-                     spacing: u * 0.022, strength: 0.44, seed: seed &+ UInt64(k * 17))
+                let sxp = cx + bed.rx * (0.05 + Double(k) * 0.21)
+                let syp = cy + u * (0.06 - Double(k) * 0.01)
+                let slice = lumpPoints(cx: sxp, cy: syp + u * 0.10, rx: bed.rx * 0.21 * sc,
+                                       ry: u * 0.13, squash: 0.42, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, slice, Chord(shadow: chord.body.dk(0.05),
+                                            body: chord.body.lt(0.16),
+                                            light: chord.light.lt(0.10)),
+                            depth: 0.6, seed: seed &+ UInt64(k * 17))
                 p.clip(polyPath(slice)) {
-                    for j in 0..<7 {
-                        let t = Double(j) / 6.0 - 0.5
-                        penBroken(p, [CGPoint(x: sx - hw * 0.5, y: sy + t * hh * 1.1),
-                                      CGPoint(x: sx + hw * 0.5, y: sy + t * hh * 1.1 + hh * 0.08)],
-                                  weight: u * 0.010, colour: Ink.cream.al(0.55),
-                                  pieces: 2, gap: 0.14, wobble: 0.5,
+                    for j in 0..<4 {
+                        let yy = syp + u * (0.03 + Double(j) * 0.045)
+                        penBroken(p, [pnt(sxp - bed.rx * 0.16, yy), pnt(sxp + bed.rx * 0.16, yy)],
+                                  weight: u * 0.007, colour: Paint.creamWhite.al(0.6),
+                                  pieces: 2, gap: 0.15, wobble: 0.4,
                                   seed: seed &+ UInt64(k * 31 + j))
                     }
                 }
+                penContour(p, slice, weight: u * 0.009, colour: Ink.sepia.al(0.75),
+                           seed: seed &+ UInt64(k * 23))
             }
 
         case "dropBalls":
-            let n = rng.i(4, 6)
+            let n = rng.i(4, 5)
             for k in 0..<n {
-                let a = Double(k) / Double(n) * 6.283185 + rng.r(-0.2, 0.2)
-                let rr = k == 0 ? 0.0 : rng.r(0.42, 0.66)
-                let bx = cx + cos(a) * bed.rx * rr * sc
-                let by = cy + sin(a) * bed.ry * rr * sc
-                let r = u * rng.r(0.17, 0.23) * sc
-                let ball = jitterRing(bx, by, r, r * 0.94, rough: 0.06, steps: 24,
-                                      seed: seed &+ UInt64(k * 13))
-                mass(p, ball, palette, depth: 2, weight: u * 0.018, spacing: u * 0.024,
-                     strength: 0.48, seed: seed &+ UInt64(k * 17))
-                stipple(p, polyPath(ball), density: 0.0030, sizeMin: u * 0.005,
-                        sizeMax: u * 0.012, colour: Ink.umber.al(0.45), seed: seed &+ UInt64(k * 23))
-                sheen(p, cx: bx, cy: by, rx: r, ry: r * 0.9, seed: seed)
+                let back = k % 2 == 1
+                let t = Double(k) / Double(max(1, n - 1))
+                let bx = cx - bed.rx * 0.55 + bed.rx * 1.1 * t
+                let by = cy + (back ? u * 0.17 : 0)
+                let r = u * rng.r(0.15, 0.175) * sc
+                let ball = lumpPoints(cx: bx, cy: by + r * 0.6, rx: r, ry: r * 0.92,
+                                      squash: 0.5, seed: seed &+ UInt64(k * 13))
+                gouacheForm(p, ball, chord, seed: seed &+ UInt64(k * 17))
+                p.clip(polyPath(ball)) {
+                    for j in 0..<6 {
+                        p.disc(bx + rng.r(-0.6, 0.6) * r, by + r * 0.6 + rng.r(-0.5, 0.6) * r,
+                               u * rng.r(0.004, 0.008), chord.shadow.al(0.5))
+                        _ = j
+                    }
+                }
+                inkOver(p, ball, weight: u * 0.011, seed: seed &+ UInt64(k * 23))
             }
 
         case "springRolls":
-            let n = 3
-            for k in 0..<n {
-                let t = Double(k) - 1.0
-                let rx = bed.rx * 0.66 * sc, ry = bed.ry * 0.13 * sc
-                let rcx = cx + t * bed.rx * 0.10, rcy = cy + t * bed.ry * 0.38 * sc
-                let ang = 0.22 * t
+            // two lying crossed, one leaning on them
+            for k in 0..<3 {
+                let lean = k == 2
+                let ang = lean ? 0.55 : (k == 0 ? 0.10 : -0.14)
+                let rcx = cx + (lean ? bed.rx * 0.05 : (Double(k) - 0.5) * bed.rx * 0.16)
+                let rcy = cy + (lean ? u * 0.16 : Double(k) * u * 0.05)
+                let L = bed.rx * 0.60 * sc
+                let H = u * 0.095 * sc
                 var tube: [CGPoint] = []
-                for j in 0...20 {
-                    let uu = Double(j) / 20.0 * 2 - 1
-                    tube.append(CGPoint(x: rcx + uu * rx * cos(ang) - ry * sin(ang),
-                                        y: rcy + uu * rx * sin(ang) + ry * cos(ang)))
+                for j in 0...14 {
+                    let t = Double(j) / 14.0 * 2 - 1
+                    tube.append(pnt(rcx + t * L * cos(ang) - H * sin(ang),
+                                    rcy + H + t * L * sin(ang) + H * cos(ang)))
                 }
-                for j in stride(from: 20, through: 0, by: -1) {
-                    let uu = Double(j) / 20.0 * 2 - 1
-                    tube.append(CGPoint(x: rcx + uu * rx * cos(ang) + ry * sin(ang),
-                                        y: rcy + uu * rx * sin(ang) - ry * cos(ang)))
+                for j in stride(from: 14, through: 0, by: -1) {
+                    let t = Double(j) / 14.0 * 2 - 1
+                    tube.append(pnt(rcx + t * L * cos(ang) + H * sin(ang),
+                                    rcy + H + t * L * sin(ang) - H * cos(ang)))
                 }
-                mass(p, tube, Ink.ochre.mix(palette, 0.28), depth: 2, weight: u * 0.018,
-                     spacing: u * 0.022, strength: 0.40, seed: seed &+ UInt64(k * 19))
-                // the blistered skin
-                stipple(p, polyPath(tube), density: 0.0040, sizeMin: u * 0.004,
-                        sizeMax: u * 0.011, colour: Ink.umber.al(0.5), seed: seed &+ UInt64(k * 23))
-                // the cut end
-                let end = ellipsePoints(cx: rcx + rx * cos(ang), cy: rcy + rx * sin(ang),
-                                        rx: ry * 0.55, ry: ry * 1.02, steps: 16)
-                mass(p, end, Ink.herb.mix(palette, 0.35), depth: 1, weight: u * 0.012,
-                     spacing: u * 0.016, strength: 0.5, seed: seed &+ UInt64(k * 29))
+                gouacheForm(p, tube, Chord(shadow: Paint.chord("ochre").shadow,
+                                           body: Paint.chord("ochre").body.lt(0.08),
+                                           light: Paint.chord("ochre").light.lt(0.05)),
+                            seed: seed &+ UInt64(k * 19))
+                p.clip(polyPath(tube)) {
+                    for j in 0..<8 {
+                        p.disc(rcx + rng.r(-0.8, 0.8) * L, rcy + H + rng.r(-0.8, 0.8) * H,
+                               u * rng.r(0.003, 0.007), Paint.chord("umber").body.al(0.5))
+                        _ = j
+                    }
+                }
+                inkOver(p, tube, weight: u * 0.010, hatchShadow: false, seed: seed &+ UInt64(k * 23))
+                // cut end
+                let endC = ringPoints(rcx + L * cos(ang), rcy + H + L * sin(ang),
+                                      H * 0.6, H * 0.95, steps: 12)
+                gouache(p, endC, Paint.herbGreen, seed: seed &+ UInt64(k * 29))
+                penContour(p, endC, weight: u * 0.007, colour: Ink.sepia.al(0.8),
+                           seed: seed &+ UInt64(k * 31))
             }
 
         default:
-            let heap = jitterRing(cx, cy, bed.rx * 0.70 * sc, bed.ry * 0.64 * sc,
-                                  rough: 0.10, steps: 28, seed: seed &+ 3)
-            mass(p, heap, palette, depth: 2, weight: u * 0.020, spacing: u * 0.026,
-                 strength: 0.46, seed: seed &+ 5)
+            let mound = heapPoints(cx: cx, cy: cy, rx: bed.rx * 0.7 * sc,
+                                   height: u * 0.3 * sc, rough: 0.08, seed: seed &+ 3)
+            gouacheForm(p, mound, chord, seed: seed &+ 5)
+            inkOver(p, mound, weight: u * 0.012, seed: seed &+ 7)
         }
     }
 
     if layer == 0 { bed.overdraw() }
-}
-
-// MARK: - Garnish
-
-func drawGarnish(_ p: Plate, _ kind: String, bed: Bed, palette: Col, seed: UInt64, index: Int) {
-    let u = min(bed.rx, bed.ry)
-    var rng = RNG(seed &+ UInt64(index * 733) &+ 17)
-
-    inBed(p, bed) {
-        switch kind {
-
-        case "herbSprigs":
-            for k in 0..<rng.i(4, 7) {
-                let a = rng.r(0, 6.283), rr = rng.r(0.15, 0.80)
-                let hx = bed.cx + cos(a) * bed.rx * rr
-                let hy = bed.cy + sin(a) * bed.ry * rr
-                let dir = rng.r(0, 6.283)
-                let len = u * rng.r(0.16, 0.30)
-                let stem = [CGPoint(x: hx, y: hy),
-                            CGPoint(x: hx + cos(dir) * len * 0.6, y: hy + sin(dir) * len * 0.6),
-                            CGPoint(x: hx + cos(dir + 0.3) * len, y: hy + sin(dir + 0.3) * len)]
-                penStroke(p, stem, weight: u * 0.012, colour: Ink.herb.dk(0.20),
-                          wobble: 0.4, taper: true, seed: seed &+ UInt64(k * 13))
-                for j in 0..<5 {
-                    let t = 0.25 + Double(j) / 4.0 * 0.72
-                    let lx = hx + cos(dir + 0.15) * len * t
-                    let ly = hy + sin(dir + 0.15) * len * t
-                    let side: Double = j % 2 == 0 ? 1 : -1
-                    let leaf = ellipsePoints(cx: lx + cos(dir + side * 1.4) * u * 0.035,
-                                             cy: ly + sin(dir + side * 1.4) * u * 0.035,
-                                             rx: u * 0.038, ry: u * 0.020, steps: 12)
-                    p.poly(leaf, Ink.herb.al(0.75))
-                    penContour(p, leaf, weight: u * 0.007, colour: Ink.herb.dk(0.35),
-                               seed: seed &+ UInt64(k * 31 + j))
-                }
-            }
-
-        case "seedScatter":
-            for k in 0..<90 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.5)
-                let sx = bed.cx + cos(a) * bed.rx * 0.92 * rr
-                let sy = bed.cy + sin(a) * bed.ry * 0.88 * rr
-                let sr = u * rng.r(0.008, 0.017)
-                p.ellipse(sx, sy, sr, sr * 0.72, Ink.umber.al(rng.r(0.45, 0.9)))
-                _ = k
-            }
-
-        case "sesameDust":
-            for k in 0..<130 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.45)
-                let sx = bed.cx + cos(a) * bed.rx * 0.90 * rr
-                let sy = bed.cy + sin(a) * bed.ry * 0.86 * rr
-                let sr = u * rng.r(0.006, 0.012)
-                let dark = rng.chance(0.3)
-                let e = ellipsePoints(cx: sx, cy: sy, rx: sr * 1.3, ry: sr * 0.8, steps: 8)
-                p.poly(e, dark ? Ink.char.al(0.8) : Ink.cream.al(0.9))
-                penContour(p, e, weight: u * 0.004, colour: Ink.sepiaSoft.al(0.5),
-                           seed: seed &+ UInt64(k))
-            }
-
-        case "chiliSlices":
-            for k in 0..<rng.i(4, 7) {
-                let a = rng.r(0, 6.283), rr = rng.r(0.2, 0.82)
-                let sx = bed.cx + cos(a) * bed.rx * rr
-                let sy = bed.cy + sin(a) * bed.ry * rr
-                let r = u * rng.r(0.045, 0.075)
-                let ring = ellipsePoints(cx: sx, cy: sy, rx: r, ry: r * rng.r(0.55, 0.9), steps: 16)
-                p.poly(ring, Ink.crimson.al(0.80))
-                penContour(p, ring, weight: u * 0.008, colour: Ink.crimson.dk(0.35),
-                           seed: seed &+ UInt64(k * 11))
-                for j in 0..<5 {
-                    let sa = Double(j) / 5.0 * 6.283
-                    p.disc(sx + cos(sa) * r * 0.42, sy + sin(sa) * r * 0.32, u * 0.008,
-                           Ink.cream.al(0.85))
-                }
-            }
-
-        case "scallionRings":
-            for k in 0..<rng.i(6, 10) {
-                let a = rng.r(0, 6.283), rr = rng.r(0.15, 0.85)
-                let sx = bed.cx + cos(a) * bed.rx * rr
-                let sy = bed.cy + sin(a) * bed.ry * rr
-                let r = u * rng.r(0.035, 0.058)
-                let outer = ellipsePoints(cx: sx, cy: sy, rx: r, ry: r * rng.r(0.6, 0.95), steps: 16)
-                p.poly(outer, Ink.herb.lt(0.10).al(0.85))
-                penContour(p, outer, weight: u * 0.008, colour: Ink.herb.dk(0.35),
-                           seed: seed &+ UInt64(k * 7))
-                let inner = ellipsePoints(cx: sx, cy: sy, rx: r * 0.45, ry: r * 0.38, steps: 12)
-                p.poly(inner, Ink.paper.al(0.55))
-                penContour(p, inner, weight: u * 0.005, colour: Ink.herb.dk(0.20),
-                           seed: seed &+ UInt64(k * 13))
-            }
-
-        case "citrusWedge":
-            let a = rng.r(0, 6.283)
-            let wx = bed.cx + cos(a) * bed.rx * 0.66
-            let wy = bed.cy + sin(a) * bed.ry * 0.60
-            let r = u * 0.24
-            let tilt = rng.r(0, 6.283)
-            var wedge: [CGPoint] = [CGPoint(x: wx, y: wy)]
-            for j in 0...14 {
-                let t = tilt - 0.6 + Double(j) / 14.0 * 1.2
-                wedge.append(CGPoint(x: wx + cos(t) * r, y: wy + sin(t) * r))
-            }
-            mass(p, wedge, Ink.saffron.lt(0.10), depth: 1, weight: u * 0.014,
-                 spacing: u * 0.020, strength: 0.44, seed: seed &+ 5)
-            for j in 0..<5 {
-                let t = tilt - 0.5 + Double(j) / 4.0 * 1.0
-                penStroke(p, [CGPoint(x: wx, y: wy),
-                              CGPoint(x: wx + cos(t) * r * 0.92, y: wy + sin(t) * r * 0.92)],
-                          weight: u * 0.009, colour: Ink.cream.al(0.85), wobble: 0.3,
-                          taper: true, seed: seed &+ UInt64(j * 11))
-            }
-            penStroke(p, [CGPoint(x: wx + cos(tilt - 0.6) * r, y: wy + sin(tilt - 0.6) * r),
-                          CGPoint(x: wx + cos(tilt) * r * 1.06, y: wy + sin(tilt) * r * 1.06),
-                          CGPoint(x: wx + cos(tilt + 0.6) * r, y: wy + sin(tilt + 0.6) * r)],
-                      weight: u * 0.024, colour: Ink.herb.mix(Ink.saffron, 0.5).dk(0.10),
-                      wobble: u * 0.004, taper: false, seed: seed &+ 23)
-
-        case "sauceDrizzle":
-            for k in 0..<3 {
-                var line: [CGPoint] = []
-                let a0 = rng.r(0, 6.283)
-                for j in 0...26 {
-                    let t = Double(j) / 26.0
-                    let a = a0 + t * 5.2
-                    let r = bed.rx * (0.14 + t * 0.66)
-                    line.append(CGPoint(x: bed.cx + cos(a) * r, y: bed.cy + sin(a) * r * 0.92))
-                }
-                penStroke(p, line, weight: u * rng.r(0.018, 0.030),
-                          colour: (k % 2 == 0 ? Ink.char : palette.dk(0.30)).al(0.72),
-                          wobble: u * 0.005, taper: true, seed: seed &+ UInt64(k * 17))
-            }
-
-        case "creamDollop":
-            let a = rng.r(0, 6.283)
-            let dx = bed.cx + cos(a) * bed.rx * 0.30
-            let dy = bed.cy + sin(a) * bed.ry * 0.28
-            let r = u * 0.22
-            var dollop: [CGPoint] = []
-            for j in 0..<26 {
-                let t = Double(j) / 26.0 * 6.283185
-                let peak = 1.0 + 0.30 * max(0, sin(t)) + 0.10 * sin(t * 5)
-                dollop.append(CGPoint(x: dx + cos(t) * r, y: dy + sin(t) * r * peak))
-            }
-            mass(p, dollop, Ink.cream.lt(0.40), depth: 1, weight: u * 0.014,
-                 spacing: u * 0.020, strength: 0.24, seed: seed &+ 5)
-            penStroke(p, [CGPoint(x: dx, y: dy + r * 1.15),
-                          CGPoint(x: dx + r * 0.22, y: dy + r * 1.42)],
-                      weight: u * 0.016, colour: Ink.sepiaSoft.al(0.6), wobble: 0.4,
-                      taper: true, seed: seed &+ 11)
-
-        case "nutCrumbs":
-            for k in 0..<rng.i(14, 22) {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.5)
-                let nx = bed.cx + cos(a) * bed.rx * 0.85 * rr
-                let ny = bed.cy + sin(a) * bed.ry * 0.80 * rr
-                let nr = u * rng.r(0.018, 0.040)
-                let bit = blob(cx: nx, cy: ny, rx: nr, ry: nr * rng.r(0.5, 0.85), rough: 0.30,
-                               steps: 10, seed: seed &+ UInt64(k * 13))
-                p.poly(bit, Ink.ochre.dk(0.10).al(0.8))
-                penContour(p, bit, weight: u * 0.006, colour: Ink.umber.al(0.7),
-                           seed: seed &+ UInt64(k * 7))
-            }
-
-        case "oliveScatter":
-            for k in 0..<rng.i(4, 7) {
-                let a = rng.r(0, 6.283), rr = rng.r(0.2, 0.82)
-                let ox = bed.cx + cos(a) * bed.rx * rr
-                let oy = bed.cy + sin(a) * bed.ry * rr
-                let r = u * rng.r(0.045, 0.070)
-                let ol = ellipsePoints(cx: ox, cy: oy, rx: r, ry: r * 0.78, steps: 16)
-                mass(p, ol, rng.chance(0.5) ? Ink.herb.dk(0.25) : Ink.plum.dk(0.15),
-                     depth: 1, weight: u * 0.010, spacing: u * 0.016, strength: 0.6,
-                     seed: seed &+ UInt64(k * 11))
-                p.ellipse(ox - r * 0.25, oy + r * 0.22, r * 0.24, r * 0.16, Ink.paper.al(0.35))
-            }
-
-        case "powderDust":
-            for k in 0..<220 {
-                let a = rng.r(0, 6.283), rr = pow(rng.d(), 0.35)
-                let dx = bed.cx + cos(a) * bed.rx * 0.94 * rr
-                let dy = bed.cy + sin(a) * bed.ry * 0.90 * rr
-                p.disc(dx, dy, u * rng.r(0.003, 0.009),
-                       (rng.chance(0.5) ? Ink.crimson : Ink.saffron).al(rng.r(0.20, 0.55)))
-                _ = k
-            }
-
-        case "flowerPetals":
-            for k in 0..<rng.i(3, 6) {
-                let a = rng.r(0, 6.283), rr = rng.r(0.25, 0.85)
-                let fx = bed.cx + cos(a) * bed.rx * rr
-                let fy = bed.cy + sin(a) * bed.ry * rr
-                let r = u * rng.r(0.045, 0.070)
-                let tilt = rng.r(0, 6.283)
-                for j in 0..<5 {
-                    let pa = tilt + Double(j) / 5.0 * 6.283185
-                    let petal = ellipsePoints(cx: fx + cos(pa) * r * 0.62,
-                                              cy: fy + sin(pa) * r * 0.62,
-                                              rx: r * 0.44, ry: r * 0.28, steps: 12)
-                    p.poly(petal, Ink.blush.al(0.72))
-                    penContour(p, petal, weight: u * 0.005, colour: Ink.plum.al(0.55),
-                               seed: seed &+ UInt64(k * 31 + j))
-                }
-                p.disc(fx, fy, r * 0.24, Ink.saffron.al(0.85))
-            }
-
-        default:
-            break
-        }
-    }
 }

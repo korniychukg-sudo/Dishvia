@@ -262,6 +262,42 @@ struct TickMark: View {
     }
 }
 
+/// The luggage-tag mark used for the want-to-try list.
+struct TagMark: View {
+    var size: CGFloat = 16
+    var filled: Bool = false
+    var colour: Color = Book.ink
+
+    var body: some View {
+        Canvas { ctx, s in
+            let w = s.width, h = s.height
+            var p = Path()
+            p.move(to: CGPoint(x: w * 0.22, y: h * 0.62))
+            p.addLine(to: CGPoint(x: w * 0.46, y: h * 0.86))
+            p.addLine(to: CGPoint(x: w * 0.84, y: h * 0.48))
+            p.addLine(to: CGPoint(x: w * 0.80, y: h * 0.16))
+            p.addLine(to: CGPoint(x: w * 0.50, y: h * 0.14))
+            p.closeSubpath()
+            if filled {
+                ctx.fill(p, with: .color(colour))
+            }
+            ctx.stroke(p, with: .color(colour),
+                       style: StrokeStyle(lineWidth: max(1.2, w * 0.075), lineJoin: .round))
+            let hole = CGRect(x: w * 0.62, y: h * 0.30, width: w * 0.13, height: w * 0.13)
+            ctx.stroke(Path(ellipseIn: hole),
+                       with: .color(filled ? Book.paper : colour),
+                       style: StrokeStyle(lineWidth: max(1.0, w * 0.055)))
+            var string = Path()
+            string.move(to: CGPoint(x: w * 0.68, y: h * 0.34))
+            string.addQuadCurve(to: CGPoint(x: w * 0.30, y: h * 0.20),
+                                control: CGPoint(x: w * 0.42, y: h * 0.42))
+            ctx.stroke(string, with: .color(colour.opacity(0.8)),
+                       style: StrokeStyle(lineWidth: max(0.9, w * 0.045)))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// A short row of leader dots, used to separate a label from its value.
 struct LeaderRule: View {
     var colour: Color = Book.inkFaint

@@ -167,11 +167,31 @@ struct DishView: View {
     }
 
     private var stampAction: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             WideButton(title: "Stamp this plate", tint: Book.stampRed) {
                 Feedback.tap(store)
                 pressing = true
             }
+            Button {
+                Feedback.tap(store)
+                store.toggleWish(dish.id)
+            } label: {
+                HStack(spacing: 8) {
+                    TagMark(size: 17, filled: store.isWished(dish.id),
+                            colour: store.isWished(dish.id) ? Book.wash("herb") : Book.inkSoft)
+                    Text(store.isWished(dish.id) ? "On your list" : "Add to my list")
+                        .font(Type.heading(15))
+                        .foregroundColor(store.isWished(dish.id) ? Book.wash("herb") : Book.inkSoft)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke((store.isWished(dish.id) ? Book.wash("herb") : Book.inkSoft)
+                            .opacity(0.45), lineWidth: 1.2)
+                )
+            }
+            .buttonStyle(.plain)
             Text("Stamp it once you have actually eaten it.")
                 .font(Type.body(12))
                 .foregroundColor(Book.inkFaint)

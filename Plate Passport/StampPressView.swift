@@ -12,6 +12,8 @@ struct StampPressView: View {
     @State private var struckAt: Int? = nil
     @State private var inkSpread: Double = 0
     @State private var pending: DispatchWorkItem? = nil
+    /// The visas this stamp advanced, captured at the instant of the strike.
+    @State private var advanced: [(visa: Visa, remaining: Int)] = []
 
     private let travel: Double = 0.85            // seconds from hover to strike
 
@@ -133,10 +135,42 @@ struct StampPressView: View {
                         .foregroundColor(Book.inkSoft)
                 }
             } else {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Text(DayNumber.stampText(struckAt ?? DayNumber.today()))
                         .font(Type.mono(14))
                         .foregroundColor(Book.inkSoft)
+
+                    if !advanced.isEmpty {
+                        VStack(spacing: 6) {
+                            Text("THIS STAMP MOVED")
+                                .font(Type.label(9.5))
+                                .tracking(1.7)
+                                .foregroundColor(Book.inkFaint)
+                            ForEach(Array(advanced.prefix(3)), id: \.visa.id) { item in
+                                HStack(spacing: 8) {
+                                    VisaIcon(size: 15, colour: Book.inkSoft)
+                                    Text(item.visa.title)
+                                        .font(Type.serif(14))
+                                        .foregroundColor(Book.ink)
+                                    Spacer(minLength: 6)
+                                    Text(item.remaining == 0 ? "ISSUED"
+                                                             : "\(item.remaining) to go")
+                                        .font(Type.label(10))
+                                        .tracking(0.8)
+                                        .foregroundColor(item.remaining == 0
+                                                         ? Book.wash("herb") : Book.inkSoft)
+                                }
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Book.card.opacity(0.9))
+                                )
+                            }
+                        }
+                        .frame(maxWidth: 330)
+                    }
+
                     Text("Rate it and write a note back on the plate.")
                         .font(Type.body(13))
                         .foregroundColor(Book.inkFaint)
@@ -180,6 +214,7 @@ struct StampPressView: View {
         pending = nil
         let day = DayNumber.today()
         store.addStamp(dishID: dish.id, day: day)
+        advanced = store.visasAdvanced(by: dish.id)
         Feedback.strike(store)
         withAnimation(.easeOut(duration: 0.18)) { struckAt = day }
         inkSpread = 0

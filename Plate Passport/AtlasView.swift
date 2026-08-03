@@ -9,6 +9,7 @@ struct AtlasView: View {
     @State private var query = ""
     @State private var tag: String? = nil
     @State private var onlyUnstamped = false
+    @State private var onlyWished = false
 
     var body: some View {
         ZStack {
@@ -88,6 +89,7 @@ struct AtlasView: View {
                 Button {
                     Feedback.tap(store)
                     onlyUnstamped.toggle()
+                    if onlyUnstamped { onlyWished = false }
                 } label: {
                     Text(onlyUnstamped ? "UNSTAMPED" : "ALL")
                         .font(Type.label(10))
@@ -98,6 +100,21 @@ struct AtlasView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .fill(onlyUnstamped ? Book.ink : Book.ink.opacity(0.07))
+                        )
+                }
+                .buttonStyle(.plain)
+                Button {
+                    Feedback.tap(store)
+                    onlyWished.toggle()
+                    if onlyWished { onlyUnstamped = false }
+                } label: {
+                    TagMark(size: 16, filled: onlyWished,
+                            colour: onlyWished ? Book.paper : Book.inkSoft)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(onlyWished ? Book.wash("herb") : Book.ink.opacity(0.07))
                         )
                 }
                 .buttonStyle(.plain)
@@ -152,6 +169,7 @@ struct AtlasView: View {
     private func countryRow(_ cuisine: Cuisine) -> some View {
         let total = Catalog.dishesByCuisine[cuisine.id]?.count ?? 0
         let done = store.stampCount(inCuisine: cuisine.id)
+        let match = store.palateMatch(cuisineID: cuisine.id)
         return PaperCard {
             HStack(spacing: 12) {
                 PlateImage(folder: "cuisine", name: cuisine.id, corner: 9)
@@ -163,6 +181,13 @@ struct AtlasView: View {
                             .foregroundColor(Book.ink)
                         if store.isComplete(cuisineID: cuisine.id) {
                             TickMark(size: 12, colour: Book.wash("herb"))
+                        }
+                        if let match = match {
+                            Spacer(minLength: 4)
+                            Text("\(match)% YOU")
+                                .font(Type.label(9))
+                                .tracking(0.8)
+                                .foregroundColor(match >= 80 ? Book.wash("herb") : Book.inkFaint)
                         }
                     }
                     Text(cuisine.tagline)
@@ -190,6 +215,7 @@ struct AtlasView: View {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
         return Catalog.dishes.filter { dish in
             if onlyUnstamped && store.isStamped(dish.id) { return false }
+            if onlyWished && !store.isWished(dish.id) { return false }
             if let tag = tag, !dish.tags.contains(tag) { return false }
             guard !needle.isEmpty else { return true }
             if dish.name.lowercased().contains(needle) { return true }
@@ -211,9 +237,9 @@ struct AtlasView: View {
                     .tracking(1.2)
                     .foregroundColor(Book.inkFaint)
                 Spacer()
-                if tag != nil || onlyUnstamped || !query.isEmpty {
+                if tag != nil || onlyUnstamped || onlyWished || !query.isEmpty {
                     Button {
-                        query = ""; tag = nil; onlyUnstamped = false
+                        query = ""; tag = nil; onlyUnstamped = false; onlyWished = false
                     } label: {
                         Text("CLEAR")
                             .font(Type.label(10))
@@ -258,6 +284,13 @@ struct AtlasView: View {
                     ZStack {
                         Circle().fill(Book.card)
                         TickMark(size: 11, colour: Book.wash("herb"))
+                    }
+                    .frame(width: 22, height: 22)
+                    .padding(6)
+                } else if store.isWished(dish.id) {
+                    ZStack {
+                        Circle().fill(Book.card)
+                        TagMark(size: 12, filled: true, colour: Book.wash("herb"))
                     }
                     .frame(width: 22, height: 22)
                     .padding(6)
@@ -377,6 +410,7 @@ struct CuisineView: View {
 
     private var stampRow: some View {
         let done = store.stampCount(inCuisine: cuisine.id)
+        let match = store.palateMatch(cuisineID: cuisine.id)
         return PaperCard {
             HStack(spacing: 14) {
                 ZStack {
@@ -389,11 +423,20 @@ struct CuisineView: View {
                 }
                 .frame(width: 78, height: 78)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(done == 0 ? "No impression yet"
-                                   : (done == dishes.count ? "Country complete"
-                                                           : "\(done) of \(dishes.count) plates"))
-                        .font(Type.heading(16))
-                        .foregroundColor(Book.ink)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(done == 0 ? "No impression yet"
+                                       : (done == dishes.count ? "Country complete"
+                                                               : "\(done) of \(dishes.count) plates"))
+                            .font(Type.heading(16))
+                            .foregroundColor(Book.ink)
+                        if let match = match {
+                            Spacer(minLength: 4)
+                            Text("\(match)% your kind of table")
+                                .font(Type.label(10))
+                                .tracking(0.6)
+                                .foregroundColor(match >= 80 ? Book.wash("herb") : Book.inkFaint)
+                        }
+                    }
                     RuledProgress(value: done, target: dishes.count,
                                   tint: Book.stampInk(cuisine.stampInk))
                     Text(done == 0

@@ -84,9 +84,77 @@ final class PassportStore: ObservableObject {
         let record = StampRecord(dishID: dishID, day: day, rating: 0, note: "", place: "",
                                  seed: seedValue(dishID + "-\(day)"))
         save.stamps.append(record)
+        save.wishlist.removeAll { $0 == dishID }   // eaten — off the list
         persist()
         collectNews()
         return record
+    }
+
+    // MARK: - Want-to-try list
+
+    func isWished(_ dishID: String) -> Bool { save.wishlist.contains(dishID) }
+
+    func toggleWish(_ dishID: String) {
+        if let i = save.wishlist.firstIndex(of: dishID) {
+            save.wishlist.remove(at: i)
+        } else if !isStamped(dishID) {
+            save.wishlist.append(dishID)
+        }
+        persist()
+    }
+
+    var wishlistDishes: [Dish] {
+        save.wishlist.compactMap { Catalog.dishByID[$0] }
+    }
+
+    var wishCount: Int { save.wishlist.count }
+
+    // MARK: - Palate match
+
+    /// How close a cuisine's average plate sits to your own palate, 0-100.
+    /// Meaningless until a few stamps exist, so nil below five.
+    func palateMatch(cuisineID: String) -> Int? {
+        guard stampCount >= 5,
+              let dishes = Catalog.dishesByCuisine[cuisineID], !dishes.isEmpty else { return nil }
+        let mine = palate
+        var avg = [Double](repeating: 0, count: 6)
+        for d in dishes {
+            for (i, v) in d.profile.values.enumerated() { avg[i] += Double(v) }
+        }
+        avg = avg.map { $0 / Double(dishes.count) }
+        var dist = 0.0
+        for (a, b) in zip(mine, avg) { dist += (a - b) * (a - b) }
+        // maximum possible distance on six 0-3 axes
+        let worst = (Double(6) * 9.0).squareRoot()
+        let score = 100.0 * (1.0 - dist.squareRoot() / worst)
+        return Int(score.rounded())
+    }
+
+    /// The three kitchens whose average table best fits the palate so far.
+    var bestMatchedCuisines: [(cuisine: Cuisine, match: Int)] {
+        guard stampCount >= 5 else { return [] }
+        return Catalog.cuisines
+            .compactMap { c in palateMatch(cuisineID: c.id).map { (c, $0) } }
+            .sorted { $0.1 > $1.1 }
+            .prefix(3)
+            .map { ($0.0, $0.1) }
+    }
+
+    /// The visas a stamp on this dish would advance — shown after the strike.
+    func visasAdvanced(by dishID: String) -> [(visa: Visa, remaining: Int)] {
+        guard let dish = Catalog.dishByID[dishID],
+              let cuisine = Catalog.cuisineByID[dish.cuisineID] else { return [] }
+        return Lore.visas.compactMap { visa in
+            let counts: Bool
+            switch visa.rule {
+            case .region(let id, _): counts = cuisine.regionID == id
+            case .tag(let tag, _):   counts = dish.tags.contains(tag)
+            default:                 counts = true
+            }
+            guard counts, !isIssued(visa) else { return nil }
+            return (visa, max(0, visa.requirement - progress(for: visa)))
+        }
+        .sorted { $0.remaining < $1.remaining }
     }
 
     func updateStamp(dishID: String, rating: Int? = nil, note: String? = nil, place: String? = nil) {

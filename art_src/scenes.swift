@@ -38,22 +38,52 @@ func plateMark(_ p: Plate, inset: Double, seed: UInt64) {
               seed: seed &+ 5)
 }
 
-/// A cloth under the vessel: one wash, a fold or two, a hem.
-private func tableCloth(_ p: Plate, seed: UInt64, palette: Col) {
+/// The dining-room behind a plate: a muted wall band above, a cloth below,
+/// both painted opaquely and tinted toward the dish palette.
+private func tableSetting(_ p: Plate, seed: UInt64, paletteKey: String, horizon: Double) {
     var rng = RNG(seed)
-    let horizon = p.h * 0.74
-    washBand(p, from: -20, to: horizon, palette.lt(0.55).mix(Ink.paper, 0.45),
-             strength: 0.20, seed: seed &+ 3)
-    // the table edge
-    penBroken(p, [CGPoint(x: -10, y: horizon), CGPoint(x: p.w + 10, y: horizon + rng.r(-6, 6))],
-              weight: 2.0, colour: Ink.sepiaSoft.al(0.45), pieces: 3, gap: 0.08,
-              wobble: 1.4, seed: seed &+ 7)
-    // folds falling away from the light
-    for k in 0..<3 {
-        let x = p.w * (0.18 + Double(k) * 0.30) + rng.r(-40, 40)
-        penBroken(p, [CGPoint(x: x, y: 0), CGPoint(x: x + rng.r(-24, 24), y: horizon * 0.92)],
-                  weight: 1.4, colour: Ink.sepiaSoft.al(0.22), pieces: 3, gap: 0.14,
-                  wobble: 2.0, seed: seed &+ UInt64(k * 11))
+    let chord = Paint.chord(paletteKey)
+
+    // wall: deep, calm, tinted paper
+    let wallTone = Ink.paperWarm.dk(0.075).mix(chord.body, 0.13)
+    gouache(p, [pnt(-20, horizon), pnt(p.w + 20, horizon),
+                pnt(p.w + 20, p.h + 20), pnt(-20, p.h + 20)],
+            wallTone, unevenness: 0.05, edgeDark: 0.02, seed: seed &+ 3)
+
+    // cloth: warm cream tinted toward the palette, with woven stripes
+    let clothTone = Ink.paperWarm.lt(0.02).mix(chord.body, 0.10)
+    gouache(p, [pnt(-20, -20), pnt(p.w + 20, -20),
+                pnt(p.w + 20, horizon), pnt(-20, horizon)],
+            clothTone, unevenness: 0.06, edgeDark: 0.02, seed: seed &+ 5)
+    for k in 0..<2 {
+        let y = horizon * (0.30 + Double(k) * 0.38) + rng.r(-8, 8)
+        penStroke(p, [pnt(-10, y), pnt(p.w + 10, y + rng.r(-4, 4))],
+                  weight: 2.6, colour: chord.body.al(0.35), wobble: 1.2,
+                  taper: false, seed: seed &+ UInt64(k * 11))
+        penStroke(p, [pnt(-10, y - 7), pnt(p.w + 10, y - 7 + rng.r(-4, 4))],
+                  weight: 1.1, colour: chord.body.al(0.28), wobble: 1.0,
+                  taper: false, seed: seed &+ UInt64(k * 13))
+    }
+    // the table edge line
+    penStroke(p, [pnt(-10, horizon), pnt(p.w + 10, horizon + rng.r(-4, 4))],
+              weight: 2.4, colour: Ink.sepia.al(0.5), wobble: 1.2, taper: false,
+              seed: seed &+ 17)
+}
+
+/// The finished frame: double rule with corner diamonds, in ink and gilt ochre.
+func plateFrame(_ p: Plate, inset: Double, seed: UInt64) {
+    let m = inset
+    let outer = [pnt(m, m), pnt(p.w - m, m), pnt(p.w - m, p.h - m), pnt(m, p.h - m)]
+    penContour(p, outer, weight: 2.6, colour: Ink.sepia.al(0.72), seed: seed &+ 3)
+    let m2 = m + min(p.w, p.h) * 0.014
+    let innerR = [pnt(m2, m2), pnt(p.w - m2, m2), pnt(p.w - m2, p.h - m2), pnt(m2, p.h - m2)]
+    penContour(p, innerR, weight: 1.0, colour: Paint.chord("ochre").shadow.al(0.65),
+               seed: seed &+ 5)
+    let d = min(p.w, p.h) * 0.016
+    for (cx, cy) in [(m, m), (p.w - m, m), (p.w - m, p.h - m), (m, p.h - m)] {
+        let diamond = [pnt(cx, cy + d), pnt(cx + d, cy), pnt(cx, cy - d), pnt(cx - d, cy)]
+        p.poly(diamond, Paint.chord("ochre").body.al(0.85))
+        penContour(p, diamond, weight: 1.0, colour: Ink.sepia.al(0.7), seed: seed &+ u64(Int(cx)))
     }
 }
 
@@ -63,136 +93,115 @@ func renderDishPlate(_ spec: DishSpec, size: Int) -> Plate {
     let p = Plate(size, size)
     let seed = inkSeed(spec.id)
     var rng = RNG(seed)
-    p.light = rng.r(2.0, 2.7)
-    let palette = Ink.wash(spec.palette)
+    p.light = rng.r(2.1, 2.6)
 
     layPaper(p, seed: seed &+ 1, tone: Ink.paperWarm)
-    tableCloth(p, seed: seed &+ 2, palette: palette)
+    tableSetting(p, seed: seed &+ 2, paletteKey: spec.palette, horizon: p.h * 0.64)
 
-    let bed = vessel(p, kind: spec.vessel, cuisineKey: spec.cuisine, palette: palette,
-                     seed: seed &+ 11)
+    let unit = Double(size) * 1.10
+    let bed = vessel(p, kind: spec.vessel, cuisineKey: spec.cuisine,
+                     paletteKey: spec.palette, seed: seed &+ 11,
+                     cx: p.w * 0.5, cy: p.h * 0.40, unit: unit)
 
     if bed.upright {
-        // A glass stacks: a column of contents with a couple of strata, then the
-        // main archetype small on top like a float or a scoop.
+        // A glass: fill with the palette body, strata, bubbles, food on top.
         let box = bed.clip.boundingBox
+        let chord = Paint.chord(spec.palette)
         p.clip(bed.clip) {
-            let full = [CGPoint(x: box.minX, y: box.minY), CGPoint(x: box.maxX, y: box.minY),
-                        CGPoint(x: box.maxX, y: box.maxY), CGPoint(x: box.minX, y: box.maxY)]
-            wash(p, full, palette, strength: 0.46, bleed: 5, seed: seed &+ 13)
-            for k in 0..<3 {
-                let y = Double(box.minY) + Double(box.height) * (0.24 + Double(k) * 0.24)
-                penBroken(p, [CGPoint(x: box.minX, y: y), CGPoint(x: box.maxX, y: y)],
-                          weight: 2.0, colour: Ink.sepiaSoft.al(0.30), pieces: 2, gap: 0.12,
-                          wobble: 2.2, seed: seed &+ UInt64(k * 17))
+            gouache(p, [pnt(Double(box.minX), Double(box.minY)),
+                        pnt(Double(box.maxX), Double(box.minY)),
+                        pnt(Double(box.maxX), Double(box.maxY)),
+                        pnt(Double(box.minX), Double(box.maxY))],
+                    chord.body, unevenness: 0.07, edgeDark: 0.04, seed: seed &+ 13)
+            for k in 0..<2 {
+                let y = Double(box.minY) + Double(box.height) * (0.30 + Double(k) * 0.30)
+                gouache(p, [pnt(Double(box.minX), y), pnt(Double(box.maxX), y),
+                            pnt(Double(box.maxX), y + Double(box.height) * 0.06),
+                            pnt(Double(box.minX), y + Double(box.height) * 0.06)],
+                        k == 0 ? chord.light : chord.shadow, unevenness: 0.04,
+                        edgeDark: 0.03, seed: seed &+ UInt64(k * 17))
             }
-            // bubbles rising through it
-            for k in 0..<26 {
-                let bx = Double(box.minX) + rng.d() * Double(box.width)
-                let by = Double(box.minY) + rng.d() * Double(box.height)
-                let br = Double(box.width) * rng.r(0.014, 0.045)
-                let ring = ellipsePoints(cx: bx, cy: by, rx: br, ry: br, steps: 12)
-                penStroke(p, ring + [ring[0]], weight: 1.1, colour: Ink.paper.al(0.45),
-                          wobble: 0.4, taper: false, seed: seed &+ UInt64(k * 5))
+            for k in 0..<14 {
+                p.disc(Double(box.minX) + rng.d() * Double(box.width),
+                       Double(box.minY) + rng.d() * Double(box.height),
+                       Double(box.width) * rng.r(0.015, 0.04),
+                       Paint.creamWhite.al(rng.r(0.25, 0.5)))
+                _ = k
             }
         }
-        let top = Bed(cx: Double(box.midX), cy: Double(box.maxY) - Double(box.height) * 0.13,
-                      rx: Double(box.width) * 0.46, ry: Double(box.height) * 0.13,
+        let top = Bed(cx: Double(box.midX), cy: Double(box.maxY) - Double(box.height) * 0.16,
+                      rx: Double(box.width) * 0.44, ry: Double(box.height) * 0.10,
                       clip: bed.clip)
-        drawFood(p, spec.main, bed: top, palette: palette, seed: seed &+ 23, layer: 0)
+        drawFood(p, spec.main, bed: top, paletteKey: spec.palette, seed: seed &+ 23, layer: 0)
         for (i, g) in spec.garnish.prefix(2).enumerated() {
-            drawGarnish(p, g, bed: top, palette: palette, seed: seed &+ 41, index: i)
+            drawGarnish(p, g, bed: top, paletteKey: spec.palette, seed: seed &+ 41, index: i)
         }
     } else {
-        drawFood(p, spec.main, bed: bed, palette: palette, seed: seed &+ 23, layer: 0)
-        for (i, e) in spec.extras.prefix(2).enumerated() {
-            drawFood(p, e, bed: bed, palette: palette, seed: seed &+ UInt64(31 + i * 13),
-                     layer: i + 1)
+        // Liquids and grains are the bed the dish sits in, not a side dish:
+        // they fill the vessel first, at full size. Solid extras sit behind.
+        let baseKinds: Set<String> = ["brothSurface", "curryPool", "riceScatter", "porridge"]
+        let bases = spec.extras.filter { baseKinds.contains($0) }
+        let sides = spec.extras.filter { !baseKinds.contains($0) }
+        for (i, e) in bases.prefix(2).enumerated() {
+            drawFood(p, e, bed: bed, paletteKey: spec.palette,
+                     seed: seed &+ UInt64(29 + i * 7), layer: 0)
         }
+        for (i, e) in sides.prefix(2).enumerated() {
+            drawFood(p, e, bed: bed, paletteKey: spec.palette,
+                     seed: seed &+ UInt64(31 + i * 13), layer: i + 1)
+        }
+        drawFood(p, spec.main, bed: bed, paletteKey: spec.palette, seed: seed &+ 23, layer: 0)
         for (i, g) in spec.garnish.prefix(3).enumerated() {
-            drawGarnish(p, g, bed: bed, palette: palette, seed: seed &+ 41, index: i)
+            drawGarnish(p, g, bed: bed, paletteKey: spec.palette, seed: seed &+ 41, index: i)
         }
     }
 
-    plateMark(p, inset: Double(size) * 0.045, seed: seed &+ 97)
+    plateFrame(p, inset: Double(size) * 0.040, seed: seed &+ 97)
     return p
 }
 
 // MARK: - A cuisine's table
 
-/// Three of the country's dishes laid out together, near / middle / far.
+/// Three of the country's dishes on one canvas, painted back to front.
 func renderCuisineScene(id: String, specs: [DishSpec], size: (Int, Int)) -> Plate {
     let p = Plate(size.0, size.1)
     let seed = inkSeed("scene-" + id)
-    var rng = RNG(seed)
     p.light = 2.35
-    let palette = Ink.wash(specs.first?.palette ?? "amber")
+    let paletteKey = specs.first?.palette ?? "amber"
 
     layPaper(p, seed: seed &+ 1, tone: Ink.paperWarm)
+    tableSetting(p, seed: seed &+ 2, paletteKey: paletteKey, horizon: p.h * 0.66)
 
-    // far wall, with a shelf line and a hung cloth
-    washBand(p, from: p.h * 0.62, to: p.h, Ink.umber.lt(0.45), strength: 0.16, seed: seed &+ 3)
-    penBroken(p, [CGPoint(x: 0, y: p.h * 0.66), CGPoint(x: p.w, y: p.h * 0.66 + rng.r(-8, 8))],
-              weight: 2.4, colour: Ink.sepiaSoft.al(0.40), pieces: 4, gap: 0.06,
-              wobble: 1.8, seed: seed &+ 5)
-    for k in 0..<7 {
-        let x = p.w * (0.06 + Double(k) * 0.14)
-        penBroken(p, [CGPoint(x: x, y: p.h * 0.68), CGPoint(x: x + rng.r(-14, 14), y: p.h)],
-                  weight: 1.3, colour: Ink.sepiaSoft.al(0.18), pieces: 3, gap: 0.16,
-                  wobble: 2.4, seed: seed &+ UInt64(k * 13))
-    }
-    tableCloth(p, seed: seed &+ 7, palette: palette)
-
-    // three settings: far small, middle large, near at the lower left
-    let layout: [(Double, Double, Double)] = [(0.78, 0.60, 0.44), (0.44, 0.42, 0.74), (0.82, 0.20, 0.54)]
+    // back to front: far small, mid, near large — opaque paint occludes honestly
+    let placements: [(Double, Double, Double)] = [(0.76, 0.56, 0.34), (0.26, 0.48, 0.42), (0.55, 0.26, 0.55)]
     for (i, spec) in specs.prefix(3).enumerated() {
-        let (fx, fy, sc) = layout[i]
-        let sub = Plate(Int(Double(size.0) * sc), Int(Double(size.0) * sc))
-        sub.light = p.light
-        // White, not paper: the sub-plate is composited with multiply, so a white
-        // ground leaves the scene's own paper showing and only the drawing lands.
-        sub.fillAll(Col(r: 1, g: 1, b: 1))
-        let subPalette = Ink.wash(spec.palette)
-        let bed = vessel(sub, kind: spec.vessel, cuisineKey: spec.cuisine,
-                         palette: subPalette, seed: inkSeed(spec.id) &+ 11)
+        let (fx, fy, sc) = placements[i]
+        let unit = Double(size.1) * sc * 1.9
+        let dishSeed = inkSeed(spec.id)
+        let bed = vessel(p, kind: spec.vessel, cuisineKey: spec.cuisine,
+                         paletteKey: spec.palette, seed: dishSeed &+ 11,
+                         cx: p.w * fx, cy: p.h * fy, unit: unit)
         if !bed.upright {
-            drawFood(sub, spec.main, bed: bed, palette: subPalette,
-                     seed: inkSeed(spec.id) &+ 23, layer: 0)
-            for (j, e) in spec.extras.prefix(1).enumerated() {
-                drawFood(sub, e, bed: bed, palette: subPalette,
-                         seed: inkSeed(spec.id) &+ UInt64(31 + j), layer: 1)
-            }
+            drawFood(p, spec.main, bed: bed, paletteKey: spec.palette,
+                     seed: dishSeed &+ 23, layer: 0)
             for (j, g) in spec.garnish.prefix(2).enumerated() {
-                drawGarnish(sub, g, bed: bed, palette: subPalette,
-                            seed: inkSeed(spec.id) &+ 41, index: j)
+                drawGarnish(p, g, bed: bed, paletteKey: spec.palette,
+                            seed: dishSeed &+ 41, index: j)
             }
         } else {
-            drawFood(sub, spec.main, bed: Bed(cx: bed.cx, cy: bed.cy, rx: bed.rx,
-                                              ry: bed.ry * 0.4, clip: bed.clip),
-                     palette: subPalette, seed: inkSeed(spec.id) &+ 23, layer: 0)
+            let box = bed.clip.boundingBox
+            let chord = Paint.chord(spec.palette)
+            p.clip(bed.clip) {
+                gouache(p, [pnt(Double(box.minX), Double(box.minY)),
+                            pnt(Double(box.maxX), Double(box.minY)),
+                            pnt(Double(box.maxX), Double(box.maxY)),
+                            pnt(Double(box.minX), Double(box.maxY))],
+                        chord.body, unevenness: 0.06, seed: dishSeed &+ 13)
+            }
         }
-        guard let img = sub.ctx.makeImage() else { continue }
-        // multiply-ish: draw it over the paper with the paper showing through the tone
-        let w = Double(size.0) * sc, h = w
-        let dest = CGRect(x: p.w * fx - w / 2, y: p.h * fy - h / 2, width: w, height: h)
-        p.ctx.saveGState()
-        p.ctx.setAlpha(i == 1 ? 1.0 : 0.88)
-        p.ctx.setBlendMode(.multiply)
-        p.ctx.draw(img, in: dest)
-        p.ctx.restoreGState()
-        castShadow(p, at: p.w * fx, y: p.h * fy - h * 0.30, width: w * 0.62,
-                   seed: seed &+ UInt64(i * 37))
     }
 
-    // near framing element: a folded cloth corner at the lower left
-    let corner = [CGPoint(x: -20, y: -20), CGPoint(x: p.w * 0.30, y: -20),
-                  CGPoint(x: p.w * 0.16, y: p.h * 0.22), CGPoint(x: -20, y: p.h * 0.30)]
-    wash(p, corner, palette.dk(0.10), strength: 0.28, bleed: 9, seed: seed &+ 11)
-    penContour(p, corner, weight: 2.4, seed: seed &+ 13)
-    hatch(p, polyPath(corner), angle: 1.0, spacing: 9, weight: 1.2,
-          colour: Ink.sepiaSoft.al(0.35), coverage: 0.7, seed: seed &+ 17)
-
-    plateMark(p, inset: Double(size.0) * 0.026, seed: seed &+ 97)
+    plateFrame(p, inset: Double(size.1) * 0.032, seed: seed &+ 97)
     return p
 }
 
@@ -314,11 +323,14 @@ func renderGuideBoard(id: String, items: [String], palettes: [String], size: (In
         let cx = p.w * (Double(i) + 0.5) / Double(n)
         let cy = p.h * 0.56
         let r = min(p.w / Double(n), p.h) * 0.34
-        let ring = ellipsePoints(cx: cx, cy: cy, rx: r, ry: r * 0.86, steps: 40)
-        let bed = Bed(cx: cx, cy: cy, rx: r * 0.86, ry: r * 0.78, clip: polyPath(ring))
-        let pal = Ink.wash(palettes.isEmpty ? "amber" : palettes[i % palettes.count])
-        drawFood(p, item, bed: bed, palette: pal, seed: seed &+ UInt64(i * 101), layer: 0)
-        castShadow(p, at: cx, y: cy - r * 0.86, width: r * 1.5, seed: seed &+ UInt64(i * 7))
+        let clipRing = CGMutablePath()
+        clipRing.addPath(polyPath(ellipsePoints(cx: cx, cy: cy, rx: r, ry: r * 0.60, steps: 40)))
+        clipRing.addRect(CGRect(x: cx - r * 0.95, y: cy, width: r * 1.9, height: r * 0.9))
+        let bed = Bed(cx: cx, cy: cy, rx: r * 0.82, ry: r * 0.34, clip: clipRing)
+        let palKey = palettes.isEmpty ? "amber" : palettes[i % palettes.count]
+        groundShadow(p, at: cx, y: cy - r * 0.30, width: r * 1.5,
+                     tone: Col(r: 0.70, g: 0.62, b: 0.51), seed: seed &+ UInt64(i * 7))
+        drawFood(p, item, bed: bed, paletteKey: palKey, seed: seed &+ UInt64(i * 101), layer: 0)
         // the ticket: a leader line down to a ruled label the app writes over
         penStroke(p, [CGPoint(x: cx, y: cy - r * 0.95), CGPoint(x: cx, y: p.h * 0.16)],
                   weight: 1.1, colour: Ink.sepiaSoft.al(0.55), wobble: 0.5, taper: false,
@@ -333,7 +345,7 @@ func renderGuideBoard(id: String, items: [String], palettes: [String], size: (In
                       wobble: 0.3, taper: false, seed: seed &+ UInt64(i * 23 + k))
         }
     }
-    plateMark(p, inset: min(p.w, p.h) * 0.028, seed: seed &+ 97)
+    plateFrame(p, inset: min(p.w, p.h) * 0.028, seed: seed &+ 97)
     return p
 }
 

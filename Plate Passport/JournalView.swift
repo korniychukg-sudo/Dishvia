@@ -20,6 +20,9 @@ struct JournalView: View {
                             emptyState
                         } else {
                             palateCard
+                            if !store.bestMatchedCuisines.isEmpty {
+                                matchesCard
+                            }
                             monthsCard
                             entries
                         }
@@ -99,6 +102,51 @@ struct JournalView: View {
                     .font(Type.mono(12))
                     .foregroundColor(Book.inkSoft)
             }
+        }
+    }
+
+    // MARK: - Matched kitchens
+
+    private var matchesCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeading(text: "Your kind of table")
+            PaperCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.bestMatchedCuisines.enumerated()), id: \.element.cuisine.id) { i, item in
+                        NavigationLink(destination: CuisineView(cuisine: item.cuisine)) {
+                            HStack(spacing: 12) {
+                                Text(String(format: "%02d", i + 1))
+                                    .font(Type.mono(12))
+                                    .foregroundColor(Book.inkFaint)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.cuisine.country)
+                                        .font(Type.heading(16))
+                                        .foregroundColor(Book.ink)
+                                    Text(item.cuisine.tagline)
+                                        .font(Type.body(12))
+                                        .foregroundColor(Book.inkSoft)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 6)
+                                Text("\(item.match)%")
+                                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                                    .foregroundColor(item.match >= 80 ? Book.wash("herb") : Book.ink)
+                                ChevronMark()
+                            }
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if i < store.bestMatchedCuisines.count - 1 {
+                            Rectangle().fill(Book.ink.opacity(0.09)).frame(height: 1)
+                        }
+                    }
+                }
+            }
+            Text("How close each kitchen's average table sits to the palate your stamps describe.")
+                .font(Type.body(11.5))
+                .foregroundColor(Book.inkFaint)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

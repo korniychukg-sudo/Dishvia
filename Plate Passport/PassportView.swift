@@ -30,6 +30,9 @@ struct PassportView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         coverCard
                         plateOfTheDay
+                        if !store.wishlistDishes.isEmpty {
+                            wishShelf
+                        }
                         if let stretch = store.stretchSuggestion, store.stampCount >= 3 {
                             stretchCard(stretch)
                         }
@@ -173,6 +176,44 @@ struct PassportView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var wishShelf: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            SectionHeading(text: "Next on your list", trailing: "\(store.wishCount) waiting")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(store.wishlistDishes) { dish in
+                        NavigationLink(destination: DishView(dish: dish)) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                ZStack(alignment: .topLeading) {
+                                    PlateImage(folder: "dish", name: dish.id, corner: 9)
+                                        .frame(width: 116, height: 116)
+                                    ZStack {
+                                        Circle().fill(Book.card)
+                                        TagMark(size: 12, filled: true, colour: Book.wash("herb"))
+                                    }
+                                    .frame(width: 22, height: 22)
+                                    .padding(6)
+                                }
+                                Text(dish.name)
+                                    .font(Type.body(11.5))
+                                    .foregroundColor(Book.ink)
+                                    .lineLimit(2)
+                                    .frame(width: 116, alignment: .leading)
+                                    .multilineTextAlignment(.leading)
+                                Text(Catalog.cuisineByID[dish.cuisineID]?.country ?? "")
+                                    .font(Type.label(9))
+                                    .tracking(0.8)
+                                    .foregroundColor(Book.inkFaint)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
     }
 
     private func stretchCard(_ dish: Dish) -> some View {

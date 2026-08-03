@@ -179,6 +179,7 @@ struct PassportSettings: Codable {
 
 struct SaveFile: Codable {
     var stamps: [StampRecord] = []
+    var wishlist: [String] = []
     var visasIssued: [String] = []
     var awardsEarned: [String] = []
     var guidesRead: [String] = []
@@ -186,6 +187,22 @@ struct SaveFile: Codable {
     var quizRounds: Int = 0
     var onboarded: Bool = false
     var settings = PassportSettings()
+
+    init() {}
+
+    // Tolerant decoding, so a save written before a field existed still loads.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stamps = (try? c.decode([StampRecord].self, forKey: .stamps)) ?? []
+        wishlist = (try? c.decode([String].self, forKey: .wishlist)) ?? []
+        visasIssued = (try? c.decode([String].self, forKey: .visasIssued)) ?? []
+        awardsEarned = (try? c.decode([String].self, forKey: .awardsEarned)) ?? []
+        guidesRead = (try? c.decode([String].self, forKey: .guidesRead)) ?? []
+        quizBest = (try? c.decode(Int.self, forKey: .quizBest)) ?? 0
+        quizRounds = (try? c.decode(Int.self, forKey: .quizRounds)) ?? 0
+        onboarded = (try? c.decode(Bool.self, forKey: .onboarded)) ?? false
+        settings = (try? c.decode(PassportSettings.self, forKey: .settings)) ?? PassportSettings()
+    }
 }
 
 // MARK: - Dates
