@@ -24,6 +24,9 @@ struct DishView: View {
                         heading
                         tagRow
                         prose
+                        if let recipe = RecipeBook.byDish[dish.id] {
+                            recipeCard(recipe)
+                        }
                         ingredients
                         radar
                         if let record = record {
@@ -121,6 +124,35 @@ struct DishView: View {
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func recipeCard(_ recipe: Recipe) -> some View {
+        NavigationLink(destination: RecipeView(dish: dish, recipe: recipe)) {
+            PaperCard(tint: Book.cover) {
+                HStack(spacing: 13) {
+                    ZStack {
+                        Circle().stroke(Book.gilt, lineWidth: 1.5).frame(width: 40, height: 40)
+                        PotIcon(size: 21, colour: Book.gilt)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("COOK IT AT HOME")
+                            .font(Type.label(9.5))
+                            .tracking(1.7)
+                            .foregroundColor(Book.giltSoft.opacity(0.85))
+                        Text("\(recipe.timeText) · serves \(recipe.serves) · \(recipe.difficultyName.lowercased())")
+                            .font(Type.heading(15.5))
+                            .foregroundColor(Book.paper)
+                        Text("Full recipe, step by step — then stamp what you made.")
+                            .font(Type.body(12))
+                            .foregroundColor(Book.paper.opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    ChevronMark(size: 12, colour: Book.giltSoft)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var ingredients: some View {

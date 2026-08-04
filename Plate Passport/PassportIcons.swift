@@ -262,6 +262,40 @@ struct TickMark: View {
     }
 }
 
+/// The little pot that marks a recipe.
+struct PotIcon: View {
+    var size: CGFloat = 20
+    var colour: Color = Book.ink
+
+    var body: some View {
+        Canvas { ctx, s in
+            let w = s.width, h = s.height
+            let line = StrokeStyle(lineWidth: max(1.2, w * 0.075), lineJoin: .round)
+            var body = Path()
+            body.move(to: CGPoint(x: w * 0.22, y: h * 0.44))
+            body.addLine(to: CGPoint(x: w * 0.78, y: h * 0.44))
+            body.addLine(to: CGPoint(x: w * 0.72, y: h * 0.72))
+            body.addQuadCurve(to: CGPoint(x: w * 0.28, y: h * 0.72),
+                              control: CGPoint(x: w * 0.50, y: h * 0.86))
+            body.closeSubpath()
+            ctx.stroke(body, with: .color(colour), style: line)
+            var lid = Path()
+            lid.move(to: CGPoint(x: w * 0.14, y: h * 0.44))
+            lid.addLine(to: CGPoint(x: w * 0.86, y: h * 0.44))
+            ctx.stroke(lid, with: .color(colour), style: line)
+            for sx in [0.36, 0.52, 0.66] {
+                var steam = Path()
+                steam.move(to: CGPoint(x: w * sx, y: h * 0.32))
+                steam.addQuadCurve(to: CGPoint(x: w * (sx + 0.04), y: h * 0.10),
+                                   control: CGPoint(x: w * (sx - 0.05), y: h * 0.20))
+                ctx.stroke(steam, with: .color(colour.opacity(0.8)),
+                           style: StrokeStyle(lineWidth: max(1.0, w * 0.055), lineCap: .round))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// The luggage-tag mark used for the want-to-try list.
 struct TagMark: View {
     var size: CGFloat = 16

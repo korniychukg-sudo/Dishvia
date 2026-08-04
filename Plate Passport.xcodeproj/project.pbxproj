@@ -34,11 +34,22 @@
 		PP0000000000000000000125 /* PassportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000025 /* PassportView.swift */; };
 		PP0000000000000000000126 /* QuizFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000026 /* QuizFactory.swift */; };
 		PP0000000000000000000127 /* QuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000027 /* QuizView.swift */; };
-		PP0000000000000000000128 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000028 /* RootView.swift */; };
-		PP0000000000000000000129 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000029 /* SettingsView.swift */; };
-		PP0000000000000000000130 /* StampArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000030 /* StampArt.swift */; };
-		PP0000000000000000000131 /* StampPressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000031 /* StampPressView.swift */; };
-		PP0000000000000000000132 /* VisasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000032 /* VisasView.swift */; };
+		PP0000000000000000000128 /* RecipeBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000028 /* RecipeBook.swift */; };
+		PP0000000000000000000129 /* RecipeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000029 /* RecipeModels.swift */; };
+		PP0000000000000000000130 /* RecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000030 /* RecipeView.swift */; };
+		PP0000000000000000000131 /* RecipesAfrica.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000031 /* RecipesAfrica.swift */; };
+		PP0000000000000000000132 /* RecipesAmericas.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000032 /* RecipesAmericas.swift */; };
+		PP0000000000000000000133 /* RecipesEastAsia.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000033 /* RecipesEastAsia.swift */; };
+		PP0000000000000000000134 /* RecipesMedEurope.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000034 /* RecipesMedEurope.swift */; };
+		PP0000000000000000000135 /* RecipesMiddleEast.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000035 /* RecipesMiddleEast.swift */; };
+		PP0000000000000000000136 /* RecipesNorthEurope.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000036 /* RecipesNorthEurope.swift */; };
+		PP0000000000000000000137 /* RecipesSouthAsia.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000037 /* RecipesSouthAsia.swift */; };
+		PP0000000000000000000138 /* RecipesSoutheastAsia.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000038 /* RecipesSoutheastAsia.swift */; };
+		PP0000000000000000000139 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000039 /* RootView.swift */; };
+		PP0000000000000000000140 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000040 /* SettingsView.swift */; };
+		PP0000000000000000000141 /* StampArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000041 /* StampArt.swift */; };
+		PP0000000000000000000142 /* StampPressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000042 /* StampPressView.swift */; };
+		PP0000000000000000000143 /* VisasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000043 /* VisasView.swift */; };
 		PP0000000000000000000361 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000341 /* Assets.xcassets */; };
 		PP0000000000000000000362 /* Art in Resources */ = {isa = PBXBuildFile; fileRef = PP0000000000000000000342 /* Art */; };
 /* End PBXBuildFile section */
@@ -71,11 +82,22 @@
 		PP0000000000000000000025 /* PassportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassportView.swift; sourceTree = "<group>"; };
 		PP0000000000000000000026 /* QuizFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizFactory.swift; sourceTree = "<group>"; };
 		PP0000000000000000000027 /* QuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizView.swift; sourceTree = "<group>"; };
-		PP0000000000000000000028 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		PP0000000000000000000029 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		PP0000000000000000000030 /* StampArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampArt.swift; sourceTree = "<group>"; };
-		PP0000000000000000000031 /* StampPressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampPressView.swift; sourceTree = "<group>"; };
-		PP0000000000000000000032 /* VisasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisasView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000028 /* RecipeBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeBook.swift; sourceTree = "<group>"; };
+		PP0000000000000000000029 /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
+		PP0000000000000000000030 /* RecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000031 /* RecipesAfrica.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesAfrica.swift; sourceTree = "<group>"; };
+		PP0000000000000000000032 /* RecipesAmericas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesAmericas.swift; sourceTree = "<group>"; };
+		PP0000000000000000000033 /* RecipesEastAsia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesEastAsia.swift; sourceTree = "<group>"; };
+		PP0000000000000000000034 /* RecipesMedEurope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesMedEurope.swift; sourceTree = "<group>"; };
+		PP0000000000000000000035 /* RecipesMiddleEast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesMiddleEast.swift; sourceTree = "<group>"; };
+		PP0000000000000000000036 /* RecipesNorthEurope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesNorthEurope.swift; sourceTree = "<group>"; };
+		PP0000000000000000000037 /* RecipesSouthAsia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesSouthAsia.swift; sourceTree = "<group>"; };
+		PP0000000000000000000038 /* RecipesSoutheastAsia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesSoutheastAsia.swift; sourceTree = "<group>"; };
+		PP0000000000000000000039 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000040 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000041 /* StampArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampArt.swift; sourceTree = "<group>"; };
+		PP0000000000000000000042 /* StampPressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampPressView.swift; sourceTree = "<group>"; };
+		PP0000000000000000000043 /* VisasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisasView.swift; sourceTree = "<group>"; };
 		PP0000000000000000000341 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		PP0000000000000000000342 /* Art */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Art; sourceTree = "<group>"; };
 		PP0000000000000000000900 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -131,11 +153,22 @@
 				PP0000000000000000000025 /* PassportView.swift */,
 				PP0000000000000000000026 /* QuizFactory.swift */,
 				PP0000000000000000000027 /* QuizView.swift */,
-				PP0000000000000000000028 /* RootView.swift */,
-				PP0000000000000000000029 /* SettingsView.swift */,
-				PP0000000000000000000030 /* StampArt.swift */,
-				PP0000000000000000000031 /* StampPressView.swift */,
-				PP0000000000000000000032 /* VisasView.swift */,
+				PP0000000000000000000028 /* RecipeBook.swift */,
+				PP0000000000000000000029 /* RecipeModels.swift */,
+				PP0000000000000000000030 /* RecipeView.swift */,
+				PP0000000000000000000031 /* RecipesAfrica.swift */,
+				PP0000000000000000000032 /* RecipesAmericas.swift */,
+				PP0000000000000000000033 /* RecipesEastAsia.swift */,
+				PP0000000000000000000034 /* RecipesMedEurope.swift */,
+				PP0000000000000000000035 /* RecipesMiddleEast.swift */,
+				PP0000000000000000000036 /* RecipesNorthEurope.swift */,
+				PP0000000000000000000037 /* RecipesSouthAsia.swift */,
+				PP0000000000000000000038 /* RecipesSoutheastAsia.swift */,
+				PP0000000000000000000039 /* RootView.swift */,
+				PP0000000000000000000040 /* SettingsView.swift */,
+				PP0000000000000000000041 /* StampArt.swift */,
+				PP0000000000000000000042 /* StampPressView.swift */,
+				PP0000000000000000000043 /* VisasView.swift */,
 				PP0000000000000000000341 /* Assets.xcassets */,
 				PP0000000000000000000342 /* Art */,
 				PP0000000000000000000900 /* Info.plist */,
@@ -248,11 +281,22 @@
 				PP0000000000000000000125 /* PassportView.swift in Sources */,
 				PP0000000000000000000126 /* QuizFactory.swift in Sources */,
 				PP0000000000000000000127 /* QuizView.swift in Sources */,
-				PP0000000000000000000128 /* RootView.swift in Sources */,
-				PP0000000000000000000129 /* SettingsView.swift in Sources */,
-				PP0000000000000000000130 /* StampArt.swift in Sources */,
-				PP0000000000000000000131 /* StampPressView.swift in Sources */,
-				PP0000000000000000000132 /* VisasView.swift in Sources */,
+				PP0000000000000000000128 /* RecipeBook.swift in Sources */,
+				PP0000000000000000000129 /* RecipeModels.swift in Sources */,
+				PP0000000000000000000130 /* RecipeView.swift in Sources */,
+				PP0000000000000000000131 /* RecipesAfrica.swift in Sources */,
+				PP0000000000000000000132 /* RecipesAmericas.swift in Sources */,
+				PP0000000000000000000133 /* RecipesEastAsia.swift in Sources */,
+				PP0000000000000000000134 /* RecipesMedEurope.swift in Sources */,
+				PP0000000000000000000135 /* RecipesMiddleEast.swift in Sources */,
+				PP0000000000000000000136 /* RecipesNorthEurope.swift in Sources */,
+				PP0000000000000000000137 /* RecipesSouthAsia.swift in Sources */,
+				PP0000000000000000000138 /* RecipesSoutheastAsia.swift in Sources */,
+				PP0000000000000000000139 /* RootView.swift in Sources */,
+				PP0000000000000000000140 /* SettingsView.swift in Sources */,
+				PP0000000000000000000141 /* StampArt.swift in Sources */,
+				PP0000000000000000000142 /* StampPressView.swift in Sources */,
+				PP0000000000000000000143 /* VisasView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
