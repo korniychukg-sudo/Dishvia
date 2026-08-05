@@ -12,7 +12,7 @@ struct PassportView: View {
             PaperBackdrop(name: "page0", tint: 0.55)
 
             VStack(spacing: 0) {
-                TopBar(title: "Plate Passport",
+                TopBar(title: "Dishvia",
                        subtitle: "\(store.stampCount) of \(Catalog.dishes.count) plates") {
                     Button { showSettings = true } label: {
                         VStack(spacing: 2.5) {

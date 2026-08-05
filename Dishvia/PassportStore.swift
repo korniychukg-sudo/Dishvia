@@ -15,7 +15,7 @@ final class PassportStore: ObservableObject {
         let detail: String
     }
 
-    private let key = "plate.passport.save.v1"
+    private let key = "dishvia.save.v1"
 
     init() {
         load()

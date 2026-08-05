@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PlatePassportApp: App {
+struct DishviaApp: App {
     @StateObject private var store = PassportStore()
     @Environment(\.scenePhase) private var scenePhase
 

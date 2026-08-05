@@ -27,7 +27,7 @@ struct OnboardingView: View {
                 Spacer()
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("PLATE PASSPORT")
+                    Text("DISHVIA")
                         .font(Type.label(11))
                         .tracking(2.6)
                         .foregroundColor(page == 0 ? Book.gilt : Book.inkFaint)

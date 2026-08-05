@@ -54,7 +54,7 @@ struct SettingsView: View {
                         SectionHeading(text: "About")
                         PaperCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Plate Passport keeps a record of the world's cooking as you actually eat your way through it. Twenty-four kitchens, one hundred and ninety-two plates, and a stamp for each one you have really tried.")
+                                Text("Dishvia keeps a record of the world's cooking as you actually eat your way through it. Twenty-four kitchens, one hundred and ninety-two plates, and a stamp for each one you have really tried.")
                                     .font(Type.serif(14.5))
                                     .foregroundColor(Book.ink)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -62,6 +62,39 @@ struct SettingsView: View {
                                     .font(Type.serif(14.5))
                                     .foregroundColor(Book.inkSoft)
                                     .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        SectionHeading(text: "Support")
+                        PaperCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Questions, a dish that deserves a page, or something that looks wrong — the support site is the place.")
+                                    .font(Type.serif(14.5))
+                                    .foregroundColor(Book.inkSoft)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Button {
+                                    Feedback.tap(store)
+                                    if let url = URL(string: "https://www.termsfeed.com/live/ab997078-7b12-46aa-ad6f-d27ed83e6f3a") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Text("Open support and privacy page")
+                                            .font(Type.heading(15))
+                                            .foregroundColor(Book.paper)
+                                        ChevronMark(size: 10, colour: Book.paper.opacity(0.8))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Book.ink)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                Text("Opens in your browser.")
+                                    .font(Type.body(11.5))
+                                    .foregroundColor(Book.inkFaint)
                             }
                         }
 
@@ -108,7 +141,7 @@ struct SettingsView: View {
                             }
                         }
 
-                        Text("Plate Passport · version 1.0")
+                        Text("Dishvia · version 1.0")
                             .font(Type.label(10))
                             .tracking(1.2)
                             .foregroundColor(Book.inkFaint)

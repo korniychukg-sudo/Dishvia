@@ -3,7 +3,7 @@
    <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES" buildForProfiling = "YES" buildForArchiving = "YES" buildForAnalyzing = "YES">
-            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "PP0000000000000000000401" BuildableName = "Plate Passport.app" BlueprintName = "Plate Passport" ReferencedContainer = "container:Plate Passport.xcodeproj">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "DV0000000000000000000401" BuildableName = "Dishvia.app" BlueprintName = "Dishvia" ReferencedContainer = "container:Dishvia.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -14,13 +14,13 @@
    </TestAction>
    <LaunchAction buildConfiguration = "Debug" selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle = "0" useCustomWorkingDirectory = "NO" ignoresPersistentStateOnLaunch = "NO" debugDocumentVersioning = "YES" debugServiceExtension = "internal" allowLocationSimulation = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
-         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "PP0000000000000000000401" BuildableName = "Plate Passport.app" BlueprintName = "Plate Passport" ReferencedContainer = "container:Plate Passport.xcodeproj">
+         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "DV0000000000000000000401" BuildableName = "Dishvia.app" BlueprintName = "Dishvia" ReferencedContainer = "container:Dishvia.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction buildConfiguration = "Release" shouldUseLaunchSchemeArgsEnv = "YES" savedToolIdentifier = "" useCustomWorkingDirectory = "NO" debugDocumentVersioning = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
-         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "PP0000000000000000000401" BuildableName = "Plate Passport.app" BlueprintName = "Plate Passport" ReferencedContainer = "container:Plate Passport.xcodeproj">
+         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "DV0000000000000000000401" BuildableName = "Dishvia.app" BlueprintName = "Dishvia" ReferencedContainer = "container:Dishvia.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
