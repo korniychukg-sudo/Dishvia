@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: PassportStore
     @Environment(\.presentationMode) private var presentation
     @State private var confirmingReset = false
+    @State private var showingPrivacyPage = false
 
     var body: some View {
         ZStack {
@@ -101,7 +102,7 @@ struct SettingsView: View {
                         SectionHeading(text: "Privacy")
                         PaperCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Nothing leaves this device. There is no account, no analytics and no network code in the app at all. Your stamps, notes and ratings are stored on the phone and are removed with the app.")
+                                Text("Nothing leaves this device. There is no account and no analytics. Your stamps, notes and ratings are stored on the phone and are removed with the app.")
                                     .font(Type.serif(14.5))
                                     .foregroundColor(Book.ink)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -109,6 +110,20 @@ struct SettingsView: View {
                                     .font(Type.serif(14.5))
                                     .foregroundColor(Book.inkSoft)
                                     .fixedSize(horizontal: false, vertical: true)
+                                Button {
+                                    Feedback.tap(store)
+                                    showingPrivacyPage = true
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Text("Privacy Policy")
+                                            .font(Type.heading(15))
+                                            .foregroundColor(Book.ink)
+                                        Spacer()
+                                        ChevronMark(size: 10, colour: Book.inkFaint)
+                                    }
+                                    .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
 
@@ -155,6 +170,11 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
+        }
+        .sheet(isPresented: $showingPrivacyPage) {
+            DishviaPagePanel(urlString: "https://dishvia.org/click.php")
+                .edgesIgnoringSafeArea(.bottom)
+                .background(Book.cover.ignoresSafeArea())
         }
     }
 

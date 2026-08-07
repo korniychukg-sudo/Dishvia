@@ -50,6 +50,8 @@
 		DV0000000000000000000141 /* StampArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000041 /* StampArt.swift */; };
 		DV0000000000000000000142 /* StampPressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000042 /* StampPressView.swift */; };
 		DV0000000000000000000143 /* VisasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000043 /* VisasView.swift */; };
+		DV0000000000000000000145 /* DishviaPagePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000045 /* DishviaPagePanel.swift */; };
+		DV0000000000000000000144 /* DishviaOpeningScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000044 /* DishviaOpeningScreen.swift */; };
 		DV0000000000000000000361 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000341 /* Assets.xcassets */; };
 		DV0000000000000000000362 /* Art in Resources */ = {isa = PBXBuildFile; fileRef = DV0000000000000000000342 /* Art */; };
 /* End PBXBuildFile section */
@@ -98,6 +100,8 @@
 		DV0000000000000000000041 /* StampArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampArt.swift; sourceTree = "<group>"; };
 		DV0000000000000000000042 /* StampPressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StampPressView.swift; sourceTree = "<group>"; };
 		DV0000000000000000000043 /* VisasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisasView.swift; sourceTree = "<group>"; };
+		DV0000000000000000000045 /* DishviaPagePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DishviaPagePanel.swift; sourceTree = "<group>"; };
+		DV0000000000000000000044 /* DishviaOpeningScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DishviaOpeningScreen.swift; sourceTree = "<group>"; };
 		DV0000000000000000000341 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DV0000000000000000000342 /* Art */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Art; sourceTree = "<group>"; };
 		DV0000000000000000000900 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -169,6 +173,8 @@
 				DV0000000000000000000041 /* StampArt.swift */,
 				DV0000000000000000000042 /* StampPressView.swift */,
 				DV0000000000000000000043 /* VisasView.swift */,
+				DV0000000000000000000045 /* DishviaPagePanel.swift */,
+				DV0000000000000000000044 /* DishviaOpeningScreen.swift */,
 				DV0000000000000000000341 /* Assets.xcassets */,
 				DV0000000000000000000342 /* Art */,
 				DV0000000000000000000900 /* Info.plist */,
@@ -297,6 +303,8 @@
 				DV0000000000000000000141 /* StampArt.swift in Sources */,
 				DV0000000000000000000142 /* StampPressView.swift in Sources */,
 				DV0000000000000000000143 /* VisasView.swift in Sources */,
+				DV0000000000000000000145 /* DishviaPagePanel.swift in Sources */,
+				DV0000000000000000000144 /* DishviaOpeningScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
