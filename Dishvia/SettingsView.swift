@@ -66,39 +66,6 @@ struct SettingsView: View {
                             }
                         }
 
-                        SectionHeading(text: "Support")
-                        PaperCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Questions, a dish that deserves a page, or something that looks wrong — the support site is the place.")
-                                    .font(Type.serif(14.5))
-                                    .foregroundColor(Book.inkSoft)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Button {
-                                    Feedback.tap(store)
-                                    if let url = URL(string: "https://www.termsfeed.com/live/ab997078-7b12-46aa-ad6f-d27ed83e6f3a") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Text("Open support and privacy page")
-                                            .font(Type.heading(15))
-                                            .foregroundColor(Book.paper)
-                                        ChevronMark(size: 10, colour: Book.paper.opacity(0.8))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Book.ink)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                Text("Opens in your browser.")
-                                    .font(Type.body(11.5))
-                                    .foregroundColor(Book.inkFaint)
-                            }
-                        }
-
                         SectionHeading(text: "Privacy")
                         PaperCard {
                             VStack(alignment: .leading, spacing: 10) {
