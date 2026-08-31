@@ -123,7 +123,7 @@ struct SettingsView: View {
                             }
                         }
 
-                        Text("Dishvia · version 1.0")
+                        Text("Dishvia · version 1.1")
                             .font(Type.label(10))
                             .tracking(1.2)
                             .foregroundColor(Book.inkFaint)
